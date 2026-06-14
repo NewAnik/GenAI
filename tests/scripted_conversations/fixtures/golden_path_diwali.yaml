@@ -1,0 +1,39 @@
+# A user states everything we need in one message, gets a curated shortlist, and picks the
+# top option — the shortest path from "Hi" to a confirmed selection.
+name: golden_path_diwali
+description: >
+  Greeting -> one-shot slot filling -> search/curate/present -> tap-to-select -> done.
+
+turns:
+  - say: "Hi"
+    expect:
+      stage: slot_filling
+      outbound:
+        - kind: text
+          contains: occasion
+
+  - say: >
+      We need gifts for our Diwali celebration for about 50 employees, around ₹500 per person,
+      eco-friendly themes, and no branding needed.
+    extracted_slots:
+      occasion: Diwali
+      recipient_count: 50
+      budget_per_recipient: 500.0
+      theme_preferences: [eco-friendly]
+      branding_needed: false
+    expect:
+      stage: presenting
+      outbound:
+        - kind: interactive_list
+        - kind: interactive_buttons
+      list_row_ids:
+        - "gift:product:101"
+        - "gift:giftbox:7"
+
+  - tap: "gift:product:101"
+    say: "Eco-Friendly Bamboo Hamper"
+    expect:
+      stage: done
+      outbound:
+        - kind: text
+          contains: Bamboo Hamper

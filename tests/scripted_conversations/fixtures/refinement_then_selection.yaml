@@ -1,0 +1,56 @@
+# A user gets a shortlist, asks for cheaper options (a refinement loop back through search and
+# curation), and then selects from the freshly re-presented list.
+name: refinement_then_selection
+description: >
+  Greeting -> slot filling -> present -> "show me cheaper options" (refine, loops back through
+  search/curate/present) -> tap-to-select -> done.
+
+turns:
+  - say: "Hey there"
+    expect:
+      stage: slot_filling
+      outbound:
+        - kind: text
+          contains: occasion
+
+  - say: >
+      Looking for onboarding kits for 30 new joiners, budget is roughly ₹1000 each,
+      tech-themed, and yes we'd like them branded with our logo.
+    extracted_slots:
+      occasion: onboarding
+      recipient_count: 30
+      budget_per_recipient: 1000.0
+      theme_preferences: [tech]
+      branding_needed: true
+    expect:
+      stage: presenting
+      outbound:
+        - kind: interactive_list
+        - kind: interactive_buttons
+
+  - say: "These look a bit pricey — can you show me some cheaper options instead?"
+    intent_classification:
+      intent: refinement
+      reason: user asked for less expensive options
+    refinement_intent:
+      adjustment_type: cheaper
+      updated_value: null
+      notes: wants a lower budget band
+    expect:
+      stage: presenting
+      outbound:
+        - kind: text
+          contains: budget-friendly
+        - kind: interactive_list
+        - kind: interactive_buttons
+      list_row_ids:
+        - "gift:product:101"
+        - "gift:giftbox:7"
+
+  - tap: "gift:giftbox:7"
+    say: "Festive Discovery Box"
+    expect:
+      stage: done
+      outbound:
+        - kind: text
+          contains: Festive Discovery Box

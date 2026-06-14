@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    image: corporate-gifting-ai:latest
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      - postgres
+      - qdrant
+    restart: unless-stopped
+
+  # Dev/test convenience only — production points DATABASE_URL at the existing,
+  # already-populated Postgres instance instead of this container.
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: corporate_gifting
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./SQL_Schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    profiles: ["redis"]
+
+  # One-shot embeddings sync job. Run on demand or via host cron:
+  #   docker compose run --rm embeddings-job
+  embeddings-job:
+    build: .
+    image: corporate-gifting-ai:latest
+    env_file: .env
+    command: ["python", "-m", "app.jobs.embed_products"]
+    depends_on:
+      - postgres
+      - qdrant
+    profiles: ["jobs"]
+    restart: "no"
+
+volumes:
+  pgdata:
+  qdrant_storage:

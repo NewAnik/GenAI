@@ -1,0 +1,13 @@
+[project]
+name = "corporate-gifting-ai"
+version = "0.1.0"
+description = "WhatsApp conversational GenAI assistant for corporate gifting"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
