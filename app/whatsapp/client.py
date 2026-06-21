@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
-
+import traceback2 as tb
 from app.config import Settings
 from app.logging_setup import get_logger
 from app.whatsapp.outbound_builders import (
@@ -74,6 +74,7 @@ class WhatsAppClient:
         try:
             response = await self._post(body)
         except Exception:
+            tb.print_exc()
             logger.exception("whatsapp_send_failed", message_type=body.get("type"))
             return SendResult(ok=False, wa_message_id=None, raw_response={})
 

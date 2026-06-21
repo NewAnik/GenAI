@@ -1,0 +1,1 @@
+aws logs tail --follow /aws/ecs/default/aws_deployment-4175-efc3 --region ap-south-1

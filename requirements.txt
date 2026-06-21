@@ -25,4 +25,5 @@ respx==0.21.1
 freezegun==1.5.1
 
 psycopg[binary]
+traceback2
 

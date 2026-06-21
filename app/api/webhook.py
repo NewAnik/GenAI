@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
-
+import traceback2 as tb
 from app.api.deps import get_orchestrator, get_settings_dep
 from app.config import Settings
 from app.logging_setup import get_logger
@@ -30,6 +30,10 @@ async def verify_webhook(request: Request, settings: Settings = Depends(get_sett
     mode = params.get("hub.mode")
     token = params.get("hub.verify_token")
     challenge = params.get("hub.challenge", "")
+    logger.info(mode)
+    logger.info(token)
+    logger.info(challenge)
+    logger.info(settings.meta_verify_token)
 
     if mode == "subscribe" and token == settings.meta_verify_token and settings.meta_verify_token:
         logger.info("webhook_verification_succeeded")
@@ -70,4 +74,5 @@ async def _handle_safely(orchestrator: ConversationOrchestrator, message: WhatsA
     try:
         await orchestrator.handle_inbound(message)
     except Exception:
+        tb.print_exc()
         logger.exception("inbound_message_handling_failed", wa_message_id=message.wa_message_id)
