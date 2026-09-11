@@ -46,6 +46,13 @@ class Order(CreatedAtMixin, Base):
     order_number: Mapped[str | None] = mapped_column(String)
     status: Mapped[str | None] = mapped_column(String)
     total_amount: Mapped[Decimal | None] = mapped_column(Numeric)
+    # Added for the website order flow (alembic 0002): the buyer, the chosen shipping
+    # address, and a denormalized payment status for cheap listing/filtering.
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    shipping_address_id: Mapped[int | None] = mapped_column(ForeignKey("addresses.id"))
+    payment_status: Mapped[str | None] = mapped_column(String)
+
+    items: Mapped[list["OrderItem"]] = relationship()
 
 
 class OrderItem(Base):
@@ -56,6 +63,10 @@ class OrderItem(Base):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
     quantity: Mapped[int | None] = mapped_column(Integer)
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric)
+    # Added for the website order flow (alembic 0002): the exact variant purchased, so
+    # cancel/fulfillment can release/decrement the correct inventory row (inventory is
+    # tracked per variant, while the base order_items schema only carried product_id).
+    variant_id: Mapped[int | None] = mapped_column(ForeignKey("product_variants.id"))
 
 
 class Payment(Base):

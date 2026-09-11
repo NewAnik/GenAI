@@ -27,6 +27,7 @@ from app.db.models.commerce import (
 from app.db.models.branding import BrandingRequest, LogoAsset
 from app.db.models.crm import AuditLog, Lead, LeadActivity
 from app.db.models.conversation import ConversationSession, RecommendationLog
+from app.db.models.storefront import Address, Cart, CartItem
 
 __all__ = [
     "Base",
@@ -59,4 +60,7 @@ __all__ = [
     "AuditLog",
     "ConversationSession",
     "RecommendationLog",
+    "Address",
+    "Cart",
+    "CartItem",
 ]

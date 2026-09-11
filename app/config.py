@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     redis_enabled: bool = False
 
+    # -- Website / storefront auth (JWT) --
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24  # 1 day
+
+    # -- Orders / checkout --
+    payment_webhook_secret: str = ""
+    gst_rate: float = 0.18  # 18% GST applied to order subtotals
+    default_warehouse_id: int | None = None  # None -> pick first warehouse with stock
+
     # -- Search tuning --
     search_min_catalog_results: int = 3
     search_min_similarity: float = 0.72

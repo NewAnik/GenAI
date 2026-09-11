@@ -14,6 +14,8 @@ qdrant-client==1.11.2
 tavily-python==0.5.0
 httpx==0.27.2
 tenacity==8.5.0
+PyJWT==2.9.0
+passlib[bcrypt]==1.7.4
 structlog==24.4.0
 apscheduler==3.10.4
 python-dotenv==1.0.1
