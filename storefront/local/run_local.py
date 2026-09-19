@@ -13,7 +13,7 @@ import argparse
 import importlib
 import json
 
-from storefront.local.fake_event import build_event
+from local.fake_event import build_event
 
 _HANDLER_MODULE_BY_PREFIX = {
     "/auth": "storefront.handlers.auth_handler",

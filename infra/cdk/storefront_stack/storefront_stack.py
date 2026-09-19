@@ -1,9 +1,15 @@
 """CDK stack for the storefront API: reads infra/config/functions.yml and loops over it to
-build one Lambda per resource plus a shared HTTP API, authenticated against the Cognito User
-Pool built by CognitoStack (see that stack's docstring for why identity lives separately).
-Adding an endpoint means adding an entry to functions.yml, not new CDK code here — see that
-file's header comment. See the migration plan (and this repo's CLAUDE.md) for the full
-rationale behind the architecture.
+build one Lambda per resource plus a shared REST API (API Gateway v1 — not HTTP API/v2),
+authenticated against the Cognito User Pool built by CognitoStack (see that stack's docstring
+for why identity lives separately). Adding an endpoint means adding an entry to functions.yml,
+not new CDK code here — see that file's header comment. See the migration plan (and this
+repo's CLAUDE.md) for the full rationale behind the architecture.
+
+REST API's `CognitoUserPoolsAuthorizer` (unlike HTTP API's `HttpUserPoolAuthorizer`) only takes
+the User Pool, not a specific app client — any confirmed user from the pool authenticates
+regardless of which client issued the token, since REST API's Cognito authorizer has no
+per-client restriction. That's why this stack no longer needs `user_pool_client` from
+CognitoStack (which still creates/exposes it, for the site's own direct-to-Cognito sign-in).
 
 Requires Docker at synth/deploy time: dependencies are bundled into a shared Lambda Layer
 inside a Lambda-runtime container (see lambda_assets.build_dependencies_layer), which
@@ -14,20 +20,31 @@ Takes the VPC and Postgres (RDS) security group from NetworkStack (see that stac
 for why the VPC is CDK-managed but the RDS instance itself deliberately isn't) — this stack
 only adds its own Lambda-facing security group and an ingress rule into the RDS one.
 
-Expects this CDK context value (pass via `-c key=value`, or cdk.context.json):
-  dbSecretArn - Secrets Manager secret ARN holding {host, port, dbname, username, password}
-               (the standard shape for an RDS-managed credentials secret) for the RDS
+Expects these CDK context values (pass via `-c key=value`, or cdk.context.json):
+  dbSecretArn - ARN of the RDS-managed master-user secret ({username, password}) for the RDS
                instance created by hand in the console — not guessed at or defaulted here,
                since that instance doesn't exist until someone creates it (see NetworkStack).
+               That secret holds only login credentials, not host/port/dbname (RDS doesn't
+               put connection endpoints there — an instance can host multiple databases), so:
+  dbHost      - the RDS instance's endpoint address.
+  dbName      - the database name to connect to.
+               Both passed as plain (non-secret) Lambda env vars — see storefront/config.py.
+
+Optionally, `apiDomainName` + `apiCertificateArn` context values attach a custom domain to the
+REST API with `SecurityPolicy: TLS_1_2` (the AWS-recommended minimum — the default
+`*.execute-api.<region>.amazonaws.com` endpoint already enforces TLS 1.2 on AWS's side with no
+config needed, so this only matters once a custom domain is in play). Requires an ACM
+certificate already issued in this stack's region (regional API) for that domain — not created
+here, since that's an out-of-band DNS-validation step. Point your own DNS (a Route 53 alias,
+say) at the CfnOutput'd regional domain name once deployed.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-from aws_cdk import Duration, Stack
-from aws_cdk import aws_apigatewayv2 as apigwv2
-from aws_cdk import aws_apigatewayv2_authorizers as apigwv2_authorizers
-from aws_cdk import aws_apigatewayv2_integrations as apigwv2_integrations
+from aws_cdk import CfnOutput, Duration, Stack
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_certificatemanager as acm
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_lambda as _lambda
@@ -48,15 +65,18 @@ CONFIG_PATH = _INFRA_ROOT / "config" / "functions.yml"
 class StorefrontStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, *, vpc: ec2.IVpc,
                  db_security_group: ec2.ISecurityGroup, user_pool: cognito.IUserPool,
-                 user_pool_client: cognito.IUserPoolClient, **kwargs) -> None:
+                 **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         functions = load_functions(CONFIG_PATH)
 
         db_secret_arn = self.node.try_get_context("dbSecretArn")
-        if not db_secret_arn:
+        db_host = self.node.try_get_context("dbHost")
+        db_name = self.node.try_get_context("dbName")
+        if not (db_secret_arn and db_host and db_name):
             raise ValueError(
-                "StorefrontStack requires -c dbSecretArn=... (see this file's module docstring)"
+                "StorefrontStack requires -c dbSecretArn=... -c dbHost=... -c dbName=... "
+                "(see this file's module docstring)"
             )
 
         db_secret = secretsmanager.Secret.from_secret_complete_arn(self, "DbSecret", db_secret_arn)
@@ -82,36 +102,64 @@ class StorefrontStack(Stack):
         storefront_code = build_storefront_code()
         dependencies_layer = build_dependencies_layer(self)
 
-        authorizer = apigwv2_authorizers.HttpUserPoolAuthorizer(
-            "CognitoAuthorizer", user_pool, user_pool_clients=[user_pool_client],
+        authorizer = apigateway.CognitoUserPoolsAuthorizer(
+            self, "CognitoAuthorizer", cognito_user_pools=[user_pool],
         )
 
-        http_api = apigwv2.HttpApi(self, "StorefrontApi", api_name="storefront-api")
+        rest_api = apigateway.RestApi(
+            self, "StorefrontApi", rest_api_name="storefront-api",
+            endpoint_types=[apigateway.EndpointType.REGIONAL],
+            domain_name=self._build_domain_name_options(),
+        )
 
         for fn_config in functions:
             fn = self._build_function(
                 fn_config, code=storefront_code, layer=dependencies_layer, vpc=vpc,
                 security_group=lambda_security_group, db_secret=db_secret,
+                db_host=db_host, db_name=db_name,
             )
-            integration = apigwv2_integrations.HttpLambdaIntegration(
-                f"{fn_config.name.capitalize()}Integration", fn
-            )
+            integration = apigateway.LambdaIntegration(fn)
             for route in fn_config.routes:
-                http_api.add_routes(
-                    path=route.path,
-                    methods=[apigwv2.HttpMethod(route.method)],
-                    integration=integration,
-                    authorizer=(authorizer if route.requires_cognito else None),
+                resource = rest_api.root.resource_for_path(route.path)
+                resource.add_method(
+                    route.method, integration,
+                    authorizer=authorizer if route.requires_cognito else None,
                 )
 
-        self.http_api = http_api
+        if rest_api.domain_name is not None:
+            CfnOutput(self, "ApiRegionalDomainName",
+                      value=rest_api.domain_name.domain_name_alias_domain_name)
+
+        self.rest_api = rest_api
+
+    def _build_domain_name_options(self) -> apigateway.DomainNameOptions | None:
+        domain_name = self.node.try_get_context("apiDomainName")
+        certificate_arn = self.node.try_get_context("apiCertificateArn")
+        if not (domain_name and certificate_arn):
+            return None
+
+        certificate = acm.Certificate.from_certificate_arn(self, "ApiCertificate", certificate_arn)
+        # TLS_1_2 is the AWS-recommended minimum for API Gateway custom domains — the default
+        # execute-api endpoint already enforces this with no config, but a custom domain name
+        # defaults to a broader/legacy policy unless told otherwise.
+        return apigateway.DomainNameOptions(
+            domain_name=domain_name, certificate=certificate,
+            endpoint_type=apigateway.EndpointType.REGIONAL,
+            security_policy=apigateway.SecurityPolicy.TLS_1_2,
+        )
 
     def _build_function(self, fn_config: FunctionConfig, *, code: _lambda.Code,
                          layer: _lambda.ILayerVersion, vpc: ec2.IVpc,
                          security_group: ec2.ISecurityGroup,
-                         db_secret: secretsmanager.ISecret) -> _lambda.Function:
+                         db_secret: secretsmanager.ISecret,
+                         db_host: str, db_name: str) -> _lambda.Function:
         environment = {
             "DB_SECRET_ARN": db_secret.secret_arn,
+            # Not part of db_secret: that's RDS's own master-user secret (username/password
+            # only) — host/dbname aren't sensitive and the RDS instance isn't CDK-managed (see
+            # NetworkStack's docstring), so there's no CDK-known endpoint to read them from.
+            "DB_HOST": db_host,
+            "DB_NAME": db_name,
             "GST_RATE": fn_config.gst_rate,
         }
         if fn_config.default_warehouse_id is not None:

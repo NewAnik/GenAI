@@ -36,3 +36,8 @@ def test_creates_the_rds_security_group():
         "AWS::EC2::SecurityGroup",
         {"GroupDescription": Match.string_like_regexp("Storefront Postgres")},
     )
+
+
+def test_creates_the_db_subnet_group():
+    template = _synth()
+    template.resource_count_is("AWS::RDS::DBSubnetGroup", 1)

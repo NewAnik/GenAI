@@ -2,14 +2,14 @@
 shipment reads, plus an admin-only shipment-create that fulfills the reservation."""
 from __future__ import annotations
 
-from storefront.config import get_settings
-from storefront.db.database import connection
-from storefront.db.repositories.order_repo import OrderRepository
-from storefront.handlers.common.auth import get_current_user, require_role
-from storefront.handlers.common.errors import NotFoundError
-from storefront.handlers.common.http import decode_body, error_response, json_response
-from storefront.handlers.common.router import dispatch
-from storefront.schemas.order import (
+from config import get_settings
+from db.database import connection
+from db.repositories.order_repo import OrderRepository
+from handlers.common.auth import get_current_user, require_role
+from handlers.common.errors import NotFoundError
+from handlers.common.http import decode_body, error_response, json_response
+from handlers.common.router import dispatch
+from schemas.order import (
     CheckoutRequest,
     CheckoutResponse,
     CreateShipmentRequest,
@@ -19,7 +19,7 @@ from storefront.schemas.order import (
     OrderSummary,
     ShipmentResponse,
 )
-from storefront.services import inventory_service, order_service
+from services import inventory_service, order_service
 
 _repo = OrderRepository()
 

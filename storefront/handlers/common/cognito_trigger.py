@@ -3,8 +3,8 @@ moment a signup is confirmed, keyed by the new Cognito `sub`. Registered on the 
 in infra/cdk/storefront_stack/storefront_stack.py."""
 from __future__ import annotations
 
-from storefront.db.database import connection
-from storefront.db.repositories.user_repo import UserRepository
+from db.database import connection
+from db.repositories.user_repo import UserRepository
 
 
 def lambda_handler(event: dict, context=None) -> dict:

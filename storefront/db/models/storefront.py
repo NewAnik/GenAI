@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from peewee import CharField, DateTimeField, DecimalField, ForeignKeyField, IntegerField, TextField
 
-from storefront.db.models.base import BaseModel, TimestampMixin
-from storefront.db.models.catalog import ProductVariant
-from storefront.db.models.users import User
+from db.models.base import BaseModel, TimestampMixin
+from db.models.catalog import ProductVariant
+from db.models.users import User
 
 
 class Address(TimestampMixin):

@@ -10,16 +10,22 @@ from __future__ import annotations
 import json
 import logging
 
-from storefront.config import get_settings
-from storefront.db.database import connection
-from storefront.db.repositories.payment_repo import PaymentRepository
-from storefront.handlers.common.auth import get_current_user
-from storefront.handlers.common.errors import NotFoundError, ValidationError
-from storefront.handlers.common.http import decode_body, error_response, json_response, raw_body
-from storefront.handlers.common.router import dispatch
-from storefront.handlers.common.signature import verify_signature
-from storefront.schemas.payment import PaymentResponse, RecordPaymentRequest, ensure_positive_amount
-from storefront.services import order_service
+from config import get_settings
+from db.database import connection
+from db.repositories.payment_repo import PaymentRepository
+from handlers.common.auth import get_current_user
+from handlers.common.errors import NotFoundError, ValidationError
+from handlers.common.http import (
+    decode_body,
+    error_response,
+    get_header,
+    json_response,
+    raw_body,
+)
+from handlers.common.router import dispatch
+from handlers.common.signature import verify_signature
+from schemas.payment import PaymentResponse, RecordPaymentRequest, ensure_positive_amount
+from services import order_service
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +59,7 @@ def _record_payment(event: dict) -> dict:
 
 def _payment_webhook(event: dict) -> dict:
     body = raw_body(event)
-    # API Gateway HTTP API lowercases every header name in the event.
-    signature_header = (event.get("headers") or {}).get("x-signature-256")
+    signature_header = get_header(event, "x-signature-256")
     settings = get_settings()
     if not settings.payment_webhook_secret or not verify_signature(
         body, signature_header, settings.payment_webhook_secret

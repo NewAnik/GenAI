@@ -5,13 +5,13 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from storefront.db.database import connection
-from storefront.db.repositories.cart_repo import CartRepository
-from storefront.handlers.common.auth import get_current_user
-from storefront.handlers.common.errors import NotFoundError, ValidationError
-from storefront.handlers.common.http import decode_body, json_response
-from storefront.handlers.common.router import dispatch
-from storefront.schemas.cart import (
+from db.database import connection
+from db.repositories.cart_repo import CartRepository
+from handlers.common.auth import get_current_user
+from handlers.common.errors import NotFoundError, ValidationError
+from handlers.common.http import decode_body, json_response
+from handlers.common.router import dispatch
+from schemas.cart import (
     AddCartItemRequest,
     CartItemResponse,
     CartResponse,

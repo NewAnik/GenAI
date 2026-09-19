@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from storefront.services.auth_service import ForbiddenError, require_group
+from services.auth_service import ForbiddenError, require_group
 
 
 def test_require_group_passes_when_user_in_group():

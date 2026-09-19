@@ -50,9 +50,16 @@ def build_dependencies_layer(scope: Construct, construct_id: str = "StorefrontDe
     host OS. Call once per stack that needs it (CDK hashes source + bundling options, so
     identical calls across stacks still only build/upload the underlying asset once — each
     call here still creates its own `AWS::Lambda::LayerVersion` resource in that stack, which
-    is cheap and avoids a cross-stack reference just to share one layer)."""
+    is cheap and avoids a cross-stack reference just to share one layer).
+
+    `exclude` scopes the asset's fingerprint down to just requirements.txt: CDK decides
+    whether to rerun Docker bundling from the *source* input's hash, not the bundled output,
+    so without this, any change anywhere under storefront/ (a handler, a model, unrelated to
+    dependencies at all) would bust the cache and rerun `pip install` in Docker on every
+    synth/deploy."""
     layer_code = _lambda.Code.from_asset(
         str(STOREFRONT_ENTRY),
+        exclude=["**", "!requirements.txt"],
         bundling=BundlingOptions(
             image=LAMBDA_RUNTIME.bundling_image,
             # "python/" is the layer directory Lambda puts on PYTHONPATH for every Python

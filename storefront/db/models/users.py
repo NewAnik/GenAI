@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from peewee import BooleanField, CharField, IntegerField, TextField
 
-from storefront.db.models.base import TimestampMixin
+from db.models.base import TimestampMixin
 
 
 class User(TimestampMixin):

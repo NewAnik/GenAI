@@ -1,7 +1,7 @@
 """Order / order-item / invoice / shipment access for the storefront."""
 from __future__ import annotations
 
-from storefront.db.models import Invoice, Order, OrderItem, Shipment
+from db.models import Invoice, Order, OrderItem, Shipment
 
 
 class OrderRepository:

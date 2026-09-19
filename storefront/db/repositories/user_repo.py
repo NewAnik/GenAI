@@ -1,7 +1,7 @@
 """User + address lookups for the storefront checkout flow and Cognito identity provisioning."""
 from __future__ import annotations
 
-from storefront.db.models import Address, User
+from db.models import Address, User
 
 
 class UserRepository:
@@ -17,6 +17,12 @@ class UserRepository:
             cognito_sub=cognito_sub, email=email, first_name=first_name, last_name=last_name,
             role="customer", is_active=True,
         )
+
+    def update_name(self, user: User, *, first_name: str, last_name: str) -> User:
+        user.first_name = first_name
+        user.last_name = last_name
+        user.save()
+        return user
 
     def get_address(self, address_id: int, *, user_id: int) -> Address | None:
         """Fetch an address only if it belongs to the given user (prevents using another

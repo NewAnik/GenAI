@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from storefront.services.auth_service import AuthError, resolve_user
+from services.auth_service import AuthError, resolve_user
 
 
 def test_resolve_user_returns_existing_user(seed):
@@ -31,7 +31,7 @@ def test_resolve_user_rejects_missing_subject_claim(database):
 
 
 def test_resolve_user_rejects_inactive_user(seed):
-    from storefront.db.models import User
+    from db.models import User
 
     user = User.get_by_id(seed["user_id"])
     user.is_active = False

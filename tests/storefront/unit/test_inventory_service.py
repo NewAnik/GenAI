@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from storefront.db.models import Inventory
-from storefront.services import inventory_service
-from storefront.services.inventory_service import InsufficientStockError
+from db.models import Inventory
+from services import inventory_service
+from services.inventory_service import InsufficientStockError
 
 
 def _inv(quantity: int, reserved: int = 0, variant_id: int = 1) -> Inventory:

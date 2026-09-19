@@ -5,7 +5,7 @@ commits/rolls back — the direct Peewee equivalent of the SQLAlchemy original's
 `.with_for_update()`."""
 from __future__ import annotations
 
-from storefront.db.models import Inventory
+from db.models import Inventory
 
 
 class InventoryRepository:

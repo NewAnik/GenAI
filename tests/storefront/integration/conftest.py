@@ -24,8 +24,8 @@ pytestmark = pytest.mark.skipif(
 def database():
     """Create every in-scope table fresh, drop them afterwards. Peewee autoconnects on
     first query, so no explicit connect() is needed here."""
-    from storefront.db.database import database as db
-    from storefront.db.models import ALL_MODELS
+    from db.database import database as db
+    from db.models import ALL_MODELS
 
     db.create_tables(ALL_MODELS)
     yield db
@@ -36,7 +36,7 @@ def database():
 def seed(database):
     """Insert a user, a product+variant, inventory of 1 unit, and a shipping address.
     Returns the ids the tests need."""
-    from storefront.db.models import Address, Inventory, Product, ProductVariant, User
+    from db.models import Address, Inventory, Product, ProductVariant, User
 
     user = User.create(
         email="buyer@example.com", cognito_sub="sub-buyer-1", role="customer", is_active=True,

@@ -1,17 +1,18 @@
 """Reads verified Cognito claims from the API Gateway authorizer context — the bearer token
-was already verified by API Gateway's native Cognito JWT Authorizer before this Lambda ever
-ran, so no JWT library is needed in this package at all."""
+was already verified by API Gateway's native REST API `CognitoUserPoolsAuthorizer` before
+this Lambda ever ran, so no JWT library is needed in this package at all. REST API's Cognito
+authorizer puts claims flat under `requestContext.authorizer.claims` (unlike HTTP API (v2)'s
+JWT authorizer, which nests them one level deeper under an extra `jwt` key)."""
 from __future__ import annotations
 
-from storefront.db.models import User
-from storefront.services.auth_service import require_group, resolve_user
+from db.models import User
+from services.auth_service import require_group, resolve_user
 
 
 def get_claims(event: dict) -> dict:
     return (
         event.get("requestContext", {})
         .get("authorizer", {})
-        .get("jwt", {})
         .get("claims", {})
     ) or {}
 

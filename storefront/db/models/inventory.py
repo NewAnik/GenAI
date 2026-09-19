@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from peewee import DateTimeField, ForeignKeyField, IntegerField
 
-from storefront.db.models.base import BaseModel
-from storefront.db.models.catalog import ProductVariant
+from db.models.base import BaseModel
+from db.models.catalog import ProductVariant
 
 
 class Inventory(BaseModel):

@@ -13,8 +13,8 @@ import hmac
 import json
 from decimal import Decimal
 
-from storefront.handlers import cart_handler, orders_handler, payments_handler
-from storefront.local.fake_event import build_event
+from handlers import cart_handler, orders_handler, payments_handler
+from local.fake_event import build_event
 
 _WEBHOOK_SECRET = "test-webhook-secret"
 
@@ -41,14 +41,14 @@ def _sign(body: bytes) -> str:
 
 
 def _inventory_reserved(inventory_id: int) -> int:
-    from storefront.db.models import Inventory
+    from db.models import Inventory
 
     return Inventory.get_by_id(inventory_id).reserved_quantity or 0
 
 
 def test_full_order_flow_reserves_stock_and_confirms_on_payment(seed, monkeypatch):
     monkeypatch.setenv("PAYMENT_WEBHOOK_SECRET", _WEBHOOK_SECRET)
-    from storefront.config import get_settings
+    from config import get_settings
 
     get_settings.cache_clear()
     claims = _claims(seed["cognito_sub"])
@@ -124,7 +124,7 @@ def test_second_checkout_for_last_unit_conflicts(seed):
     assert status == 201
 
     # A second buyer tries for the same (now fully reserved) variant.
-    from storefront.db.models import Address, User
+    from db.models import Address, User
 
     user2 = User.create(email="buyer2@example.com", cognito_sub="sub-buyer-2",
                          role="customer", is_active=True)

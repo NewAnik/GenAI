@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from peewee import DateTimeField, Model
 
-from storefront.db.database import database
+from db.database import database
 
 
 class BaseModel(Model):

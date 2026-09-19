@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from peewee import CharField, DateTimeField, DecimalField, ForeignKeyField, IntegerField, TextField
 
-from storefront.db.models.base import BaseModel, CreatedAtMixin
-from storefront.db.models.catalog import Product, ProductVariant
-from storefront.db.models.storefront import Address
-from storefront.db.models.users import User
+from db.models.base import BaseModel, CreatedAtMixin
+from db.models.catalog import Product, ProductVariant
+from db.models.storefront import Address
+from db.models.users import User
 
 
 class Order(CreatedAtMixin):

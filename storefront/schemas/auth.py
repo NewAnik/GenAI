@@ -3,7 +3,11 @@ Cognito's own SignUp/InitiateAuth APIs), so this Lambda only ever serves the pro
 already-authenticated user."""
 from __future__ import annotations
 
+from typing import Annotated
+
 import msgspec
+
+NonEmptyStr = Annotated[str, msgspec.Meta(min_length=1)]
 
 
 class UserResponse(msgspec.Struct, kw_only=True):
@@ -13,3 +17,8 @@ class UserResponse(msgspec.Struct, kw_only=True):
     last_name: str | None = None
     role: str | None = None
     organization_id: int | None = None
+
+
+class UpdateUserRequest(msgspec.Struct, kw_only=True):
+    first_name: NonEmptyStr
+    last_name: NonEmptyStr

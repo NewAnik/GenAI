@@ -4,7 +4,7 @@ row-locked the inventory row (see InventoryRepository.lock_for_variant) before m
 saving it, and committing the surrounding `database.atomic()` block."""
 from __future__ import annotations
 
-from storefront.db.models import Inventory
+from db.models import Inventory
 
 
 class InsufficientStockError(Exception):

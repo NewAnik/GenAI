@@ -8,8 +8,8 @@ from decimal import Decimal
 import msgspec
 import pytest
 
-from storefront.schemas.cart import AddCartItemRequest, CartResponse
-from storefront.schemas.payment import RecordPaymentRequest, ensure_positive_amount
+from schemas.cart import AddCartItemRequest, CartResponse
+from schemas.payment import RecordPaymentRequest, ensure_positive_amount
 
 
 def test_decimal_round_trips_through_json():

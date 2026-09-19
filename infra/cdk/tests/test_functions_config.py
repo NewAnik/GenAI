@@ -10,7 +10,7 @@ def test_loads_every_function_and_route():
     functions = load_functions(CONFIG_PATH)
     assert {fn.name for fn in functions} == {"auth", "cart", "orders", "payments"}
     total_routes = sum(len(fn.routes) for fn in functions)
-    assert total_routes == 15
+    assert total_routes == 16
 
 
 def test_defaults_apply_when_not_set_in_yaml():

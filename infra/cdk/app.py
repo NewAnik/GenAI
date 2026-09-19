@@ -7,10 +7,13 @@ from storefront_stack.storefront_stack import StorefrontStack
 
 app = cdk.App()
 network_stack = NetworkStack(app, "NetworkStack")
-cognito_stack = CognitoStack(app, "CognitoStack")
+cognito_stack = CognitoStack(
+    app, "CognitoStack",
+    vpc=network_stack.vpc, db_security_group=network_stack.db_security_group,
+)
 StorefrontStack(
     app, "StorefrontStack",
     vpc=network_stack.vpc, db_security_group=network_stack.db_security_group,
-    user_pool=cognito_stack.user_pool, user_pool_client=cognito_stack.user_pool_client,
+    user_pool=cognito_stack.user_pool,
 )
 app.synth()

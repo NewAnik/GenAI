@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from storefront.db.models import Cart, CartItem, ProductVariant
+from db.models import Cart, CartItem, ProductVariant
 
 
 class CartRepository:

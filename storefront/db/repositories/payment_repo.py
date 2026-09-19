@@ -2,7 +2,7 @@
 `transaction_reference`; a signed webhook later flips their status to paid."""
 from __future__ import annotations
 
-from storefront.db.models import Payment
+from db.models import Payment
 
 
 class PaymentRepository:

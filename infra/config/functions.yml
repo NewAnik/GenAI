@@ -29,6 +29,9 @@ functions:
       - method: POST
         path: /auth/me
         auth: cognito
+      - method: POST
+        path: /auth/me/update
+        auth: cognito
 
   cart:
     handler: storefront/handlers/cart_handler.lambda_handler

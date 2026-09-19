@@ -5,8 +5,8 @@ membership for role-gated routes. No password hashing or JWT signing/verificatio
 here — that's the whole point of the Cognito cutover (see the migration plan)."""
 from __future__ import annotations
 
-from storefront.db.models import User
-from storefront.db.repositories.user_repo import UserRepository
+from db.models import User
+from db.repositories.user_repo import UserRepository
 
 
 class AuthError(Exception):

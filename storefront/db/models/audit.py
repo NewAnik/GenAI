@@ -5,8 +5,8 @@ from __future__ import annotations
 from peewee import CharField, DateTimeField, ForeignKeyField, IntegerField
 from playhouse.postgres_ext import BinaryJSONField
 
-from storefront.db.models.base import BaseModel
-from storefront.db.models.users import User
+from db.models.base import BaseModel
+from db.models.users import User
 
 
 class AuditLog(BaseModel):

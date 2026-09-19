@@ -1,5 +1,5 @@
 """CDK assertions for StorefrontStack — synthesizes alongside NetworkStack and CognitoStack
-(no real AWS account needed; see conftest.py) and checks the expected Lambdas/API routes exist.
+(no real AWS account needed; see conftest.py) and checks the expected Lambdas/API methods exist.
 
 Requires Docker: the shared dependencies Lambda Layer bundles storefront/requirements.txt
 (including psycopg2-binary's native extension) inside a Lambda-runtime container at synth
@@ -24,28 +24,30 @@ def test_creates_one_lambda_per_resource():
     assert len(functions) == 4
 
 
-def test_creates_http_api_with_expected_route_count():
+def test_creates_rest_api_with_expected_method_count():
     template = _synth()
-    template.resource_count_is("AWS::ApiGatewayV2::Api", 1)
-    # 5 (auth) + ... — one route per entry across all 4 functions in functions.yml.
-    routes = template.find_resources("AWS::ApiGatewayV2::Route")
-    assert len(routes) == 15
+    template.resource_count_is("AWS::ApiGateway::RestApi", 1)
+    # 6 (auth) + ... — one method per entry across all 4 functions in functions.yml.
+    methods = template.find_resources("AWS::ApiGateway::Method")
+    assert len(methods) == 16
 
 
 def test_webhook_route_has_no_authorizer():
     template = _synth()
-    template.has_resource_properties(
-        "AWS::ApiGatewayV2::Route",
-        {"RouteKey": "POST /webhooks/payments", "AuthorizationType": "NONE"},
+    # Only /webhooks/payments sets `auth: none` in functions.yml.
+    methods = template.find_resources(
+        "AWS::ApiGateway::Method", {"Properties": {"AuthorizationType": "NONE"}},
     )
+    assert len(methods) == 1
 
 
-def test_protected_route_uses_cognito_authorizer():
+def test_every_other_route_uses_cognito_authorizer():
     template = _synth()
-    template.has_resource_properties(
-        "AWS::ApiGatewayV2::Route",
-        {"RouteKey": "POST /orders", "AuthorizerId": Match.any_value()},
+    methods = template.find_resources(
+        "AWS::ApiGateway::Method",
+        {"Properties": {"AuthorizationType": "COGNITO_USER_POOLS", "AuthorizerId": Match.any_value()}},
     )
+    assert len(methods) == 15
 
 
 def test_every_function_is_attached_to_the_vpc_by_default():
@@ -64,3 +66,20 @@ def test_every_function_shares_the_one_dependencies_layer():
         "AWS::Lambda::Function", {"Properties": {"Layers": Match.any_value()}},
     )
     assert len(functions) == 4
+
+
+def test_no_custom_domain_by_default():
+    template = _synth()
+    template.resource_count_is("AWS::ApiGateway::DomainName", 0)
+
+
+def test_custom_domain_uses_tls_1_2_when_configured():
+    _, _, storefront_stack = synth_stacks({
+        "apiDomainName": "api.wrappedandmore.in",
+        "apiCertificateArn": "arn:aws:acm:ap-south-1:123456789012:certificate/abc-123",
+    })
+    template = Template.from_stack(storefront_stack)
+    template.has_resource_properties(
+        "AWS::ApiGateway::DomainName",
+        {"DomainName": "api.wrappedandmore.in", "SecurityPolicy": "TLS_1_2"},
+    )

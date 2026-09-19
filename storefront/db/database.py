@@ -16,7 +16,7 @@ from typing import Iterator
 
 from playhouse.pool import PooledPostgresqlDatabase
 
-from storefront.config import get_settings
+from config import get_settings
 
 _settings = get_settings()
 

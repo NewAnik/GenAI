@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from peewee import BooleanField, CharField, DecimalField, ForeignKeyField, IntegerField, TextField
 
-from storefront.db.models.base import CreatedAtMixin, TimestampMixin
+from db.models.base import CreatedAtMixin, TimestampMixin
 
 
 class Product(TimestampMixin):

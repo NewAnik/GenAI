@@ -1,4 +1,4 @@
-"""API Gateway HTTP API (payload format v2) request/response helpers, backed by msgspec —
+"""API Gateway REST API (v1) proxy-integration request/response helpers, backed by msgspec —
 the replacement for FastAPI's automatic request validation and `response_model=`
 serialization."""
 from __future__ import annotations
@@ -8,7 +8,7 @@ from typing import Any, TypeVar
 
 import msgspec
 
-from storefront.handlers.common.errors import ValidationError
+from handlers.common.errors import ValidationError
 
 T = TypeVar("T")
 
@@ -23,6 +23,15 @@ def json_response(status_code: int, body: Any) -> dict:
 
 def error_response(status_code: int, code: str, message: str) -> dict:
     return json_response(status_code, {"error": {"code": code, "message": message}})
+
+
+def get_header(event: dict, name: str) -> str | None:
+    """Case-insensitive header lookup. Unlike HTTP API (v2), which lowercases every header
+    name in the event, API Gateway REST API preserves the casing the client sent, so a fixed
+    lowercase key lookup would miss e.g. "X-Signature-256"."""
+    headers = event.get("headers") or {}
+    name_lower = name.lower()
+    return next((v for k, v in headers.items() if k.lower() == name_lower), None)
 
 
 def raw_body(event: dict) -> bytes:
