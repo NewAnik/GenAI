@@ -7,7 +7,6 @@ import base64
 from typing import Any, TypeVar
 
 import msgspec
-
 from handlers.common.errors import ValidationError
 
 T = TypeVar("T")
@@ -16,7 +15,7 @@ T = TypeVar("T")
 def json_response(status_code: int, body: Any) -> dict:
     return {
         "statusCode": status_code,
-        "headers": {"content-type": "application/json"},
+        "headers": {"content-type": "application/json", "access-control-allow-origin": "*"},
         "body": msgspec.json.encode(body).decode("utf-8"),
     }
 
@@ -43,7 +42,7 @@ def raw_body(event: dict) -> bytes:
     return body.encode("utf-8") if isinstance(body, str) else body
 
 
-def decode_body(event: dict, struct_type: type[T]) -> T:
+def decode_body[T](event: dict, struct_type: type[T]) -> T:
     try:
         return msgspec.json.decode(raw_body(event), type=struct_type)
     except msgspec.ValidationError as exc:
