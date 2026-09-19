@@ -37,6 +37,17 @@ config needed, so this only matters once a custom domain is in play). Requires a
 certificate already issued in this stack's region (regional API) for that domain — not created
 here, since that's an out-of-band DNS-validation step. Point your own DNS (a Route 53 alias,
 say) at the CfnOutput'd regional domain name once deployed.
+
+This API is meant to be called cross-origin from the public site (wrapped-and-more, a static
+export served from its own domain — see this repo's CLAUDE.md), so every resource gets a CORS
+preflight (OPTIONS) via `default_cors_preflight_options` on the REST API root, inherited by
+every path `resource_for_path` creates. Allowed origins come from the optional `apiCorsOrigins`
+context value (comma-separated), defaulting to `http://localhost:3000` (the site's local dev
+origin) when unset — set it explicitly for any deployed environment, e.g.
+`-c apiCorsOrigins=https://wrappedandmore.in,https://www.wrappedandmore.in`. Only POST is
+allowed (every route in functions.yml is POST-only by design) and `Authorization` is one of
+Cors.DEFAULT_HEADERS already, since the site sends the Cognito token that way, not as a
+cookie — so `allow_credentials` stays off.
 """
 from __future__ import annotations
 
@@ -110,6 +121,11 @@ class StorefrontStack(Stack):
             self, "StorefrontApi", rest_api_name="storefront-api",
             endpoint_types=[apigateway.EndpointType.REGIONAL],
             domain_name=self._build_domain_name_options(),
+            default_cors_preflight_options=apigateway.CorsOptions(
+                allow_origins=self._cors_allow_origins(),
+                allow_methods=["POST"],
+                allow_headers=apigateway.Cors.DEFAULT_HEADERS,
+            ),
         )
 
         for fn_config in functions:
@@ -131,6 +147,12 @@ class StorefrontStack(Stack):
                       value=rest_api.domain_name.domain_name_alias_domain_name)
 
         self.rest_api = rest_api
+
+    def _cors_allow_origins(self) -> list[str]:
+        raw = self.node.try_get_context("apiCorsOrigins")
+        if not raw:
+            return ["http://localhost:3000"]
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
     def _build_domain_name_options(self) -> apigateway.DomainNameOptions | None:
         domain_name = self.node.try_get_context("apiDomainName")

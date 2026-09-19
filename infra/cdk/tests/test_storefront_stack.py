@@ -27,16 +27,22 @@ def test_creates_one_lambda_per_resource():
 def test_creates_rest_api_with_expected_method_count():
     template = _synth()
     template.resource_count_is("AWS::ApiGateway::RestApi", 1)
-    # 6 (auth) + ... — one method per entry across all 4 functions in functions.yml.
-    methods = template.find_resources("AWS::ApiGateway::Method")
+    # 6 (auth) + ... — one method per entry across all 4 functions in functions.yml. Filtered
+    # to AWS_PROXY integrations to exclude the MOCK-integration CORS preflight OPTIONS methods
+    # default_cors_preflight_options adds to every resource (see test_every_resource_below).
+    methods = template.find_resources(
+        "AWS::ApiGateway::Method", {"Properties": {"Integration": {"Type": "AWS_PROXY"}}},
+    )
     assert len(methods) == 16
 
 
 def test_webhook_route_has_no_authorizer():
     template = _synth()
-    # Only /webhooks/payments sets `auth: none` in functions.yml.
+    # Only /webhooks/payments sets `auth: none` in functions.yml — filtered to AWS_PROXY so the
+    # (also AuthorizationType NONE) CORS preflight OPTIONS methods don't inflate this count.
     methods = template.find_resources(
-        "AWS::ApiGateway::Method", {"Properties": {"AuthorizationType": "NONE"}},
+        "AWS::ApiGateway::Method",
+        {"Properties": {"AuthorizationType": "NONE", "Integration": {"Type": "AWS_PROXY"}}},
     )
     assert len(methods) == 1
 
@@ -66,6 +72,37 @@ def test_every_function_shares_the_one_dependencies_layer():
         "AWS::Lambda::Function", {"Properties": {"Layers": Match.any_value()}},
     )
     assert len(functions) == 4
+
+
+def test_every_resource_gets_a_cors_preflight_options_method():
+    template = _synth()
+    # One per unique resource path segment functions.yml's 16 routes expand into (intermediate
+    # segments like /orders and /orders/{order_id} count too, not just the 16 leaf routes) —
+    # see storefront_stack.py's module docstring for why CORS is needed at all here.
+    options_methods = template.find_resources(
+        "AWS::ApiGateway::Method", {"Properties": {"HttpMethod": "OPTIONS"}},
+    )
+    assert len(options_methods) == 19
+
+
+def test_cors_defaults_to_the_local_dev_origin_when_apiCorsOrigins_is_unset():
+    template = _synth()
+    template.has_resource_properties(
+        "AWS::ApiGateway::Method",
+        {
+            "HttpMethod": "OPTIONS",
+            "Integration": {
+                "IntegrationResponses": Match.array_with([
+                    Match.object_like({
+                        "ResponseParameters": Match.object_like({
+                            "method.response.header.Access-Control-Allow-Origin":
+                                "'http://localhost:3000'",
+                        }),
+                    }),
+                ]),
+            },
+        },
+    )
 
 
 def test_no_custom_domain_by_default():
