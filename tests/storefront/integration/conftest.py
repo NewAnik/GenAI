@@ -1,0 +1,59 @@
+"""Shared fixtures for DB-backed storefront integration tests.
+
+These exercise the real transaction + row-locking path (SELECT ... FOR UPDATE) and JSONB,
+so they run against a real Postgres, not SQLite. Point them at a throwaway database via:
+
+    TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/storefront_test
+
+When the env var is unset the whole module is skipped, so the default `pytest` run stays
+hermetic and offline — mirroring tests/integration/conftest.py's existing pattern.
+"""
+from __future__ import annotations
+
+import os
+from decimal import Decimal
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL"), reason="set TEST_DATABASE_URL to a throwaway Postgres to run"
+)
+
+
+@pytest.fixture
+def database():
+    """Create every in-scope table fresh, drop them afterwards. Peewee autoconnects on
+    first query, so no explicit connect() is needed here."""
+    from storefront.db.database import database as db
+    from storefront.db.models import ALL_MODELS
+
+    db.create_tables(ALL_MODELS)
+    yield db
+    db.drop_tables(ALL_MODELS, cascade=True)
+
+
+@pytest.fixture
+def seed(database):
+    """Insert a user, a product+variant, inventory of 1 unit, and a shipping address.
+    Returns the ids the tests need."""
+    from storefront.db.models import Address, Inventory, Product, ProductVariant, User
+
+    user = User.create(
+        email="buyer@example.com", cognito_sub="sub-buyer-1", role="customer", is_active=True,
+    )
+    product = Product.create(
+        name="Mug", base_price=Decimal("100"), status="active", min_order_quantity=1,
+    )
+    variant = ProductVariant.create(product_id=product.id, sku="MUG-1", price=Decimal("100"))
+    inv = Inventory.create(warehouse_id=1, variant_id=variant.id, quantity=1, reserved_quantity=0)
+    address = Address.create(
+        user_id=user.id, address_type="shipping", recipient_name="Buyer",
+        line1="1 Road", city="BLR", state="KA", pincode="560001",
+    )
+    return {
+        "user_id": user.id,
+        "cognito_sub": user.cognito_sub,
+        "variant_id": variant.id,
+        "address_id": address.id,
+        "inventory_id": inv.id,
+    }

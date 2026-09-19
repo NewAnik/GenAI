@@ -2,3 +2,6 @@
 venv
 .env
 *.pyc
+__pycache__/
+infra/cdk/cdk.out/
+infra/cdk/cdk.context.json

@@ -2,7 +2,11 @@
 name = "corporate-gifting-ai"
 version = "0.1.0"
 description = "WhatsApp conversational GenAI assistant for corporate gifting"
-requires-python = ">=3.11"
+requires-python = "==3.13"
+dependencies = [
+    "peewee>=4.5.1",
+    "psycopg2-binary>=2.9.13",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -10,4 +14,11 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py313"
+
+[dependency-groups]
+dev = [
+    "aws-cdk-lib>=2.269.0",
+    "pyyaml>=6.0.3",
+    "ruff>=0.16.7",
+]

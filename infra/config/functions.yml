@@ -1,0 +1,87 @@
+# Declarative Lambda/route config for the storefront API. storefront_stack.py reads this
+# file and loops over it to build the Lambdas + API Gateway routes — adding an endpoint
+# means adding an entry here, not new CDK code. Mirrors wrapped-and-more-admin's
+# ResourceConfig pattern (each table declared once; generic screens render from it).
+#
+# Every route is POST, by design — a single method everywhere keeps API Gateway/Cognito
+# authorizer wiring uniform and makes every request body-driven, at the cost of the usual
+# HTTP-verb semantics (GET's cacheability/idempotence, browser back-button safety). Where
+# the original design had two actions sharing one path under different methods (e.g. list
+# vs. create shipments, both under `/orders/{order_id}/shipments`), one of the two got an
+# explicit action suffix instead — otherwise both would collide on the same "POST <path>"
+# routeKey. See storefront/handlers/*.py's ROUTES dicts for the exact key each maps to.
+#
+# `auth: cognito` attaches the shared HttpUserPoolAuthorizer; `auth: none` leaves the route
+# open (the payment webhook verifies its own HMAC signature instead). `groups: [admin]` is
+# documentation only — group membership is enforced inside the handler
+# (storefront/handlers/common/auth.py's require_role), not by API Gateway itself.
+#
+# `vpc: false` on a function opts it out of the VPC entirely — defaults to true. There's no
+# NAT gateway on this VPC, so a function placed in it has no outbound internet access either,
+# only what's reachable inside the VPC/via VPC endpoints. Only set `vpc: false` for a function
+# that doesn't need Postgres (every function below currently does, via DB_SECRET_ARN) but does
+# need to call out to the public internet (a payment gateway API, WhatsApp Cloud API, etc.).
+
+functions:
+  auth:
+    handler: storefront/handlers/auth_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /auth/me
+        auth: cognito
+
+  cart:
+    handler: storefront/handlers/cart_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /cart
+        auth: cognito
+      - method: POST
+        path: /cart/items
+        auth: cognito
+      - method: POST
+        path: /cart/items/{item_id}/update
+        auth: cognito
+      - method: POST
+        path: /cart/items/{item_id}/remove
+        auth: cognito
+      - method: POST
+        path: /cart/clear
+        auth: cognito
+
+  orders:
+    handler: storefront/handlers/orders_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /checkout
+        auth: cognito
+      - method: POST
+        path: /orders
+        auth: cognito
+      - method: POST
+        path: /orders/{order_id}
+        auth: cognito
+      - method: POST
+        path: /orders/{order_id}/cancel
+        auth: cognito
+      - method: POST
+        path: /orders/{order_id}/invoice
+        auth: cognito
+      - method: POST
+        path: /orders/{order_id}/shipments
+        auth: cognito
+      - method: POST
+        path: /orders/{order_id}/shipments/create
+        auth: cognito
+        groups:
+          - admin
+
+  payments:
+    handler: storefront/handlers/payments_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /orders/{order_id}/payments
+        auth: cognito
+      - method: POST
+        path: /webhooks/payments
+        auth: none
