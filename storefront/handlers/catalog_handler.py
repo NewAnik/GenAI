@@ -23,26 +23,19 @@ def _resolve_image_url(object_key: str | None) -> str | None:
     return f"https://{domain}/{object_key}"
 
 
-def _contents_line(items) -> str:
-    parts = [f"{item.quantity or 1} x {item.product.name}" for item in items if item.product]
-    return ", ".join(parts)
-
-
 def _list_gift_boxes(event: dict) -> dict:
     boxes = _repo.list_gift_boxes()
     box_ids = [box.id for box in boxes]
-    items_by_box = _repo.items_by_gift_box(box_ids)
     hero_by_box = _repo.hero_image_by_gift_box(box_ids)
 
     summaries = []
     for box in boxes:
-        print(hero_by_box, type(next(iter(hero_by_box.keys()))), type(box.id))
         hero = hero_by_box.get(box.id)
         summaries.append(GiftBoxSummary(
             slug=box.slug, name=box.name, collection=box.collection,
             occasions=list(box.occasions or []), selling_price=box.selling_price,
             moq=box.moq, description=box.description,
-            contents=_contents_line(items_by_box.get(box.id, [])),
+            contents=box.contents_line or "",
             image_url=_resolve_image_url(hero.image_url if hero else None),
             alt_text=hero.alt_text if hero else None,
         ))

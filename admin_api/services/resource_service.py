@@ -72,6 +72,23 @@ def _execute(query, params) -> list[dict]:
         raise ValidationError("a required field is missing", "not_null_violation") from exc
 
 
+def _autofill_gift_box_contents(box_id) -> None:
+    """Fill gift_boxes.contents_line from its linked items, but only while it's still blank —
+    once an admin has customized the wording, item changes must never silently overwrite it."""
+    if box_id is None:
+        return
+    rows = _execute("SELECT contents_line FROM gift_boxes WHERE id = %s", [box_id])
+    if not rows or (rows[0]["contents_line"] or "").strip():
+        return
+    items = _execute(
+        "SELECT gi.quantity, p.name FROM gift_box_items gi "
+        "JOIN products p ON p.id = gi.product_id WHERE gi.gift_box_id = %s ORDER BY gi.id",
+        [box_id],
+    )
+    contents_line = ", ".join(f"{item['quantity'] or 1} x {item['name']}" for item in items) or None
+    _execute("UPDATE gift_boxes SET contents_line = %s WHERE id = %s", [contents_line, box_id])
+
+
 def list_resource(table: str, claims: dict, body: dict) -> dict:
     resource = _get_resource(table)
     authorize(resource, "read", claims)
@@ -177,6 +194,8 @@ def create_resource(table: str, claims: dict, body: dict) -> dict:
             actor_user_id=user.id, entity_type=table, entity_id=row.get(resource.primary_key),
             action="create", new_value=row,
         )
+    if table == "gift_box_items":
+        _autofill_gift_box_contents(row.get("gift_box_id"))
     return row
 
 
@@ -199,6 +218,10 @@ def update_resource(table: str, claims: dict, record_id: str, body: dict) -> dic
             actor_user_id=user.id, entity_type=table, entity_id=record_id,
             action="update", old_value=old_row, new_value=row,
         )
+    if table == "gift_box_items":
+        _autofill_gift_box_contents(row.get("gift_box_id"))
+        if old_row and old_row.get("gift_box_id") != row.get("gift_box_id"):
+            _autofill_gift_box_contents(old_row.get("gift_box_id"))
     return row
 
 
@@ -214,3 +237,5 @@ def delete_resource(table: str, claims: dict, record_id: str) -> None:
             actor_user_id=user.id, entity_type=table, entity_id=record_id,
             action="delete", old_value=old_row,
         )
+    if table == "gift_box_items" and old_row:
+        _autofill_gift_box_contents(old_row.get("gift_box_id"))

@@ -71,6 +71,7 @@ class GiftBox(Base):
     name: Mapped[str | None] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(Text)
     selling_price: Mapped[Decimal | None] = mapped_column(Numeric)
+    contents_line: Mapped[str | None] = mapped_column(Text)
 
     items: Mapped[list["GiftBoxItem"]] = relationship(back_populates="gift_box")
 

@@ -3,9 +3,7 @@ path behind POST /catalog/gift-boxes (see handlers/catalog_handler.py). No auth,
 scoping, unlike every other repository in this package."""
 from __future__ import annotations
 
-from collections import defaultdict
-
-from db.models import GiftBox, GiftBoxImage, GiftBoxItem, Product
+from db.models import GiftBox, GiftBoxImage
 
 
 class CatalogRepository:
@@ -18,19 +16,6 @@ class CatalogRepository:
             .where(GiftBox.slug.is_null(False), GiftBox.collection.is_null(False))
             .order_by(GiftBox.name)
         )
-
-    def items_by_gift_box(self, gift_box_ids: list[int]) -> dict[int, list[GiftBoxItem]]:
-        if not gift_box_ids:
-            return {}
-        by_box: dict[int, list[GiftBoxItem]] = defaultdict(list)
-        query = (
-            GiftBoxItem.select(GiftBoxItem, Product)
-            .join(Product)
-            .where(GiftBoxItem.gift_box.in_(gift_box_ids))
-        )
-        for item in query:
-            by_box[item.gift_box_id].append(item)
-        return dict(by_box)
 
     def hero_image_by_gift_box(self, gift_box_ids: list[int]) -> dict[int, GiftBoxImage]:
         """The lowest `display_order` per box — same "hero" convention as the admin's image

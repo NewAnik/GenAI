@@ -126,6 +126,7 @@ resources:
       - {name: moq, type: integer, writable: true}
       - {name: description, type: text, writable: true}
       - {name: selling_price, type: numeric, writable: true}
+      - {name: contents_line, type: text, writable: true}
     searchable: [name, description, slug]
     filterable: [collection]
     sortable: [name, selling_price, moq, collection]

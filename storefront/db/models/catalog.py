@@ -51,6 +51,10 @@ class GiftBox(BaseModel):
     moq = IntegerField(null=True)
     description = TextField(null=True)
     selling_price = DecimalField(max_digits=12, decimal_places=2, null=True)
+    # Auto-filled from gift_box_items by admin_api's resource_service.py the first time items are
+    # linked (while still blank) and left alone after that — an admin's own wording always wins
+    # over the raw "<qty> x <product>" join. See handlers/catalog_handler.py's read path.
+    contents_line = TextField(null=True)
 
 
 class GiftBoxItem(BaseModel):
