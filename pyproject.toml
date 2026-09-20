@@ -2,8 +2,9 @@
 name = "corporate-gifting-ai"
 version = "0.1.0"
 description = "WhatsApp conversational GenAI assistant for corporate gifting"
-requires-python = "==3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
+    "msgspec>=0.21.1",
     "peewee>=4.5.1",
     "psycopg2-binary>=2.9.13",
 ]
@@ -19,6 +20,7 @@ target-version = "py313"
 [dependency-groups]
 dev = [
     "aws-cdk-lib>=2.269.0",
+    "dotenv>=0.9.9",
     "pyyaml>=6.0.3",
     "ruff>=0.16.7",
 ]

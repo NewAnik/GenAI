@@ -8,7 +8,7 @@ splits this across `httpMethod` + `resource`, so dispatch rebuilds the same key 
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from handlers.common.errors import NotFoundError, ValidationError
 from handlers.common.http import error_response

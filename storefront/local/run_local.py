@@ -2,9 +2,14 @@
 against a local/dev Postgres — no SAM, no container/runtime emulation. Uses the same
 build_event() helper as tests/storefront, so local dev and tests exercise the same code path.
 
-Example:
-    DB_HOST=localhost DB_PORT=5432 DB_NAME=genai DB_USER=postgres DB_PASSWORD=postgres \\
-        python -m storefront.local.run_local --route "POST /cart/items" \\
+Every import under storefront/ (handlers/, services/, db/, local/) is bare — `from config
+import ...`, `from db.database import ...` — so storefront/ itself must be the import root.
+Run this from inside storefront/, not from the GenAI repo root.
+
+Example (run from storefront/):
+    cd storefront
+    DB_HOST=localhost DB_PORT=5432 DB_NAME=corporate_gifting DB_USER=postgres DB_PASSWORD=postgres \\
+        python -m local.run_local --route "POST /cart/items" \\
         --body '{"variant_id": 1, "quantity": 2}' --sub some-cognito-sub
 """
 from __future__ import annotations
@@ -16,11 +21,12 @@ import json
 from local.fake_event import build_event
 
 _HANDLER_MODULE_BY_PREFIX = {
-    "/auth": "storefront.handlers.auth_handler",
-    "/cart": "storefront.handlers.cart_handler",
-    "/checkout": "storefront.handlers.orders_handler",
-    "/orders": "storefront.handlers.orders_handler",
-    "/webhooks/payments": "storefront.handlers.payments_handler",
+    "/auth": "handlers.auth_handler",
+    "/cart": "handlers.cart_handler",
+    "/catalog": "handlers.catalog_handler",
+    "/checkout": "handlers.orders_handler",
+    "/orders": "handlers.orders_handler",
+    "/webhooks/payments": "handlers.payments_handler",
 }
 
 
