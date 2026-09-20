@@ -1,6 +1,7 @@
 """End-to-end order-flow integration tests against a real Postgres (skipped unless
-TEST_DATABASE_URL is set — see conftest.py). Covers the happy path, the oversell guard,
-cancellation/reservation-release, and the idempotent signed payment webhook.
+TEST_DATABASE_URL is set — see conftest.py). Covers the happy path, cancellation, and the
+idempotent signed payment webhook. Cart items are gift boxes; checkout does not reserve stock
+(see order_service.checkout's docstring), so there's no oversell-guard test here.
 
 Ported from tests/integration/test_order_flow.py: same scenarios, but calling Lambda
 handlers directly with a synthetic API Gateway event (build_event) instead of an httpx
@@ -40,35 +41,28 @@ def _sign(body: bytes) -> str:
     return f"sha256={digest}"
 
 
-def _inventory_reserved(inventory_id: int) -> int:
-    from db.models import Inventory
-
-    return Inventory.get_by_id(inventory_id).reserved_quantity or 0
-
-
-def test_full_order_flow_reserves_stock_and_confirms_on_payment(seed, monkeypatch):
+def test_full_order_flow_places_order_and_confirms_on_payment(seed, monkeypatch):
     monkeypatch.setenv("PAYMENT_WEBHOOK_SECRET", _WEBHOOK_SECRET)
     from config import get_settings
 
     get_settings.cache_clear()
     claims = _claims(seed["cognito_sub"])
 
-    # Add the one available unit to the cart.
+    # Add the gift box to the cart.
     status, body = _call(
         cart_handler, "POST", "/cart/items", "POST /cart/items",
-        body={"variant_id": seed["variant_id"], "quantity": 1}, claims=claims,
+        body={"gift_box_slug": seed["gift_box_slug"], "quantity": 1}, claims=claims,
     )
     assert status == 201, body
     assert Decimal(body["subtotal"]) == Decimal("100")
 
-    # Checkout -> order created, stock reserved.
+    # Checkout -> order created.
     status, body = _call(
         orders_handler, "POST", "/checkout", "POST /checkout",
         body={"shipping_address_id": seed["address_id"]}, claims=claims,
     )
     assert status == 201, body
     order_id = body["order_id"]
-    assert _inventory_reserved(seed["inventory_id"]) == 1
 
     # Order detail shows a pending order with an invoice.
     status, body = _call(
@@ -114,48 +108,19 @@ def test_full_order_flow_reserves_stock_and_confirms_on_payment(seed, monkeypatc
     assert body["status"] == "confirmed"
 
 
-def test_second_checkout_for_last_unit_conflicts(seed):
-    # Buyer takes the only unit.
-    claims1 = _claims(seed["cognito_sub"])
-    _call(cart_handler, "POST", "/cart/items", "POST /cart/items",
-          body={"variant_id": seed["variant_id"], "quantity": 1}, claims=claims1)
-    status, _ = _call(orders_handler, "POST", "/checkout", "POST /checkout",
-                       body={"shipping_address_id": seed["address_id"]}, claims=claims1)
-    assert status == 201
-
-    # A second buyer tries for the same (now fully reserved) variant.
-    from db.models import Address, User
-
-    user2 = User.create(email="buyer2@example.com", cognito_sub="sub-buyer-2",
-                         role="customer", is_active=True)
-    address2 = Address.create(user_id=user2.id, address_type="shipping", recipient_name="B2",
-                               line1="2 Road", city="BLR", state="KA", pincode="560002")
-
-    claims2 = _claims(user2.cognito_sub)
-    _call(cart_handler, "POST", "/cart/items", "POST /cart/items",
-          body={"variant_id": seed["variant_id"], "quantity": 1}, claims=claims2)
-    status, body = _call(orders_handler, "POST", "/checkout", "POST /checkout",
-                         body={"shipping_address_id": address2.id}, claims=claims2)
-    assert status == 409, body
-    # Reservation never exceeded on-hand stock.
-    assert _inventory_reserved(seed["inventory_id"]) == 1
-
-
-def test_cancel_releases_reserved_stock(seed):
+def test_cancel_transitions_order_to_cancelled(seed):
     claims = _claims(seed["cognito_sub"])
     _call(cart_handler, "POST", "/cart/items", "POST /cart/items",
-          body={"variant_id": seed["variant_id"], "quantity": 1}, claims=claims)
+          body={"gift_box_slug": seed["gift_box_slug"], "quantity": 1}, claims=claims)
     status, body = _call(orders_handler, "POST", "/checkout", "POST /checkout",
                          body={"shipping_address_id": seed["address_id"]}, claims=claims)
     order_id = body["order_id"]
-    assert _inventory_reserved(seed["inventory_id"]) == 1
 
     status, body = _call(orders_handler, "POST", f"/orders/{order_id}/cancel",
                          "POST /orders/{order_id}/cancel",
                          path_parameters={"order_id": str(order_id)}, claims=claims)
     assert status == 200
     assert body["status"] == "cancelled"
-    assert _inventory_reserved(seed["inventory_id"]) == 0
 
     # Cancel is idempotent.
     status, _ = _call(orders_handler, "POST", f"/orders/{order_id}/cancel",

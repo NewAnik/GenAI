@@ -4,23 +4,14 @@ with the payment webhook, one of only two in the whole storefront API) with `aut
 `get_current_user` call anywhere here, since browsing the catalogue needs no sign-in."""
 from __future__ import annotations
 
-from config import get_settings
 from db.database import connection
 from db.repositories.catalog_repo import CatalogRepository
 from handlers.common.http import json_response
+from handlers.common.media import resolve_catalog_image_url
 from handlers.common.router import dispatch
 from schemas.catalog import GiftBoxSummary
 
 _repo = CatalogRepository()
-
-
-def _resolve_image_url(object_key: str | None) -> str | None:
-    if not object_key:
-        return None
-    domain = get_settings().catalog_images_cdn_domain
-    if not domain:
-        return None
-    return f"https://{domain}/{object_key}"
 
 
 def _list_gift_boxes(event: dict) -> dict:
@@ -36,7 +27,7 @@ def _list_gift_boxes(event: dict) -> dict:
             occasions=list(box.occasions or []), selling_price=box.selling_price,
             moq=box.moq, description=box.description,
             contents=box.contents_line or "",
-            image_url=_resolve_image_url(hero.image_url if hero else None),
+            image_url=resolve_catalog_image_url(hero.image_url if hero else None),
             alt_text=hero.alt_text if hero else None,
         ))
     return json_response(200, summaries)

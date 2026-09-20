@@ -468,12 +468,14 @@ resources:
     columns:
       - {name: id, type: integer}
       - {name: order_id, type: integer, writable: true, required: true}
-      - {name: product_id, type: integer, writable: true, required: true}
+      - {name: product_id, type: integer, writable: true}
+      - {name: gift_box_id, type: integer, writable: true}
       - {name: quantity, type: integer, writable: true, required: true}
       - {name: unit_price, type: numeric, writable: true, required: true}
     relations:
       - {name: order, table: orders, local_key: order_id, columns: [id, order_number]}
       - {name: product, table: products, local_key: product_id, columns: [id, name]}
+      - {name: gift_box, table: gift_boxes, local_key: gift_box_id, columns: [id, name]}
     searchable: []
     filterable: [order_id]
     sortable: [order_id, quantity, unit_price]

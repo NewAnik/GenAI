@@ -17,6 +17,15 @@ class CatalogRepository:
             .order_by(GiftBox.name)
         )
 
+    def get_gift_box_by_slug(self, slug: str) -> GiftBox | None:
+        """Same catalog-ready filter as list_gift_boxes() — a box without both a slug and a
+        collection isn't purchasable even if the row exists."""
+        return (
+            GiftBox.select()
+            .where(GiftBox.slug == slug, GiftBox.collection.is_null(False))
+            .first()
+        )
+
     def hero_image_by_gift_box(self, gift_box_ids: list[int]) -> dict[int, GiftBoxImage]:
         """The lowest `display_order` per box — same "hero" convention as the admin's image
         gallery. Grouped in Python rather than a `DISTINCT ON`/window-function query, since the

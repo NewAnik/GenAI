@@ -3,9 +3,12 @@ shipment/fulfillment. Every mutation runs inside a single `database.atomic()` bl
 either the whole operation commits or it fully rolls back — the guarantee that keeps stock
 reservations and order rows consistent under concurrency.
 
-Stock safety comes from `InventoryRepository.lock_for_variant`, which issues
-`SELECT ... FOR UPDATE`: concurrent checkouts for the same variant serialize on that row,
-so two orders can never both reserve the last unit.
+`checkout()` places gift-box orders and does not reserve stock — a gift box has no inventory of
+its own yet, only its raw components do, and reconciling checkout against component stock is a
+deferred follow-up. `cancel_order`/`record_shipment` still carry variant-level stock release/
+fulfillment via `InventoryRepository.lock_for_variant` (`SELECT ... FOR UPDATE`) for any legacy
+order item that does have a `variant_id`; every gift-box order item's `variant_id` is `None`, so
+those code paths are no-ops for the orders `checkout()` now creates.
 """
 from __future__ import annotations
 
@@ -59,13 +62,15 @@ class CheckoutResult:
 
 def checkout(settings: Settings, *, user_id: int, org_id: int | None,
              shipping_address_id: int) -> CheckoutResult:
-    """Turn the user's active cart into a placed order, atomically reserving stock.
+    """Turn the user's active cart into a placed order.
 
-    Raises EmptyCartError, InvalidAddressError, or inventory_service.InsufficientStockError;
-    any of these roll back the whole transaction leaving no partial order/reservation.
+    Cart items are gift boxes, not product variants — there's no stock reservation here (that's a
+    deferred follow-up; a gift box has no inventory of its own yet, only its raw components do).
+
+    Raises EmptyCartError or InvalidAddressError; either rolls back the whole transaction leaving
+    no partial order.
     """
     cart_repo = CartRepository()
-    inv_repo = InventoryRepository()
     order_repo = OrderRepository()
     user_repo = UserRepository()
 
@@ -79,25 +84,15 @@ def checkout(settings: Settings, *, user_id: int, org_id: int | None,
         if address is None:
             raise InvalidAddressError("shipping address not found for this user")
 
-        # Reserve stock for every line first (each lock held until commit); if any line is
-        # short, InsufficientStockError propagates and the transaction rolls back.
         gst_rate = Decimal(str(settings.gst_rate))
         subtotal = Decimal("0")
-        planned_items: list[tuple[int, int | None, int, Decimal]] = []
+        planned_items: list[tuple[int | None, int, Decimal]] = []  # (gift_box_id, quantity, unit_price)
         for item in items:
-            variant = item.variant
+            gift_box = item.gift_box
             quantity = item.quantity or 0
-            unit_price = item.unit_price_snapshot or (variant.price if variant else None) or Decimal("0")
-
-            inv = inv_repo.lock_for_variant(item.variant_id, warehouse_id=settings.default_warehouse_id)
-            if inv is None:
-                raise inventory_service.InsufficientStockError(item.variant_id, quantity, 0)
-            inventory_service.reserve(inv, quantity)
-            inv.save()
-
-            product_id = variant.product_id if variant else None
+            unit_price = item.unit_price_snapshot or (gift_box.selling_price if gift_box else None) or Decimal("0")
             subtotal += unit_price * quantity
-            planned_items.append((item.variant_id, product_id, quantity, unit_price))
+            planned_items.append((item.gift_box_id, quantity, unit_price))
 
         gst_amount = (subtotal * gst_rate).quantize(Decimal("0.01"))
         total_amount = (subtotal + gst_amount).quantize(Decimal("0.01"))
@@ -109,9 +104,9 @@ def checkout(settings: Settings, *, user_id: int, org_id: int | None,
         order.order_number = _order_number(order.id)
         order.save()
 
-        for variant_id, product_id, quantity, unit_price in planned_items:
+        for gift_box_id, quantity, unit_price in planned_items:
             OrderItem.create(
-                order_id=order.id, product_id=product_id, variant_id=variant_id,
+                order_id=order.id, gift_box_id=gift_box_id,
                 quantity=quantity, unit_price=unit_price,
             )
 

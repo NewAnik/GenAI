@@ -34,18 +34,17 @@ def database():
 
 @pytest.fixture
 def seed(database):
-    """Insert a user, a product+variant, inventory of 1 unit, and a shipping address.
-    Returns the ids the tests need."""
-    from db.models import Address, Inventory, Product, ProductVariant, User
+    """Insert a user, a catalog-ready gift box, and a shipping address. Returns the ids the
+    tests need."""
+    from db.models import Address, GiftBox, User
 
     user = User.create(
         email="buyer@example.com", cognito_sub="sub-buyer-1", role="customer", is_active=True,
     )
-    product = Product.create(
-        name="Mug", base_price=Decimal("100"), status="active", min_order_quantity=1,
+    gift_box = GiftBox.create(
+        name="First Light", slug="first-light", collection="Diwali",
+        moq=1, selling_price=Decimal("100"),
     )
-    variant = ProductVariant.create(product_id=product.id, sku="MUG-1", price=Decimal("100"))
-    inv = Inventory.create(warehouse_id=1, variant_id=variant.id, quantity=1, reserved_quantity=0)
     address = Address.create(
         user_id=user.id, address_type="shipping", recipient_name="Buyer",
         line1="1 Road", city="BLR", state="KA", pincode="560001",
@@ -53,7 +52,7 @@ def seed(database):
     return {
         "user_id": user.id,
         "cognito_sub": user.cognito_sub,
-        "variant_id": variant.id,
+        "gift_box_id": gift_box.id,
+        "gift_box_slug": gift_box.slug,
         "address_id": address.id,
-        "inventory_id": inv.id,
     }

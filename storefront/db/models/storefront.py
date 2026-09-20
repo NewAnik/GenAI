@@ -3,11 +3,10 @@ reusable shipping/billing addresses. See app/db/models/storefront.py for the SQL
 original this ports from."""
 from __future__ import annotations
 
-from peewee import CharField, DateTimeField, DecimalField, ForeignKeyField, IntegerField, TextField
-
 from db.models.base import BaseModel, TimestampMixin
-from db.models.catalog import ProductVariant
+from db.models.catalog import GiftBox, ProductVariant
 from db.models.users import User
+from peewee import CharField, DateTimeField, DecimalField, ForeignKeyField, IntegerField, TextField
 
 
 class Address(TimestampMixin):
@@ -38,7 +37,10 @@ class CartItem(BaseModel):
         table_name = "cart_items"
 
     cart = ForeignKeyField(Cart, backref="items", column_name="cart_id", null=True)
+    # Unused going forward — GiftBox is the sellable unit now (below). Left in place rather than
+    # dropped since no migration removes the column.
     variant = ForeignKeyField(ProductVariant, backref="cart_items", column_name="variant_id", null=True)
+    gift_box = ForeignKeyField(GiftBox, backref="cart_items", column_name="gift_box_id", null=True)
     quantity = IntegerField(null=True)
     # Price captured when the item was added, so cart totals are stable even if the
     # catalog price later changes; re-validated at checkout.

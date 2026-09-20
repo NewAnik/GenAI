@@ -65,7 +65,6 @@ envelope:
 | 422 | `validation_error` | request body failed schema validation (wrong type, missing field, `quantity <= 0`, ...) |
 | 400 | `empty_cart` | checkout with nothing in the cart |
 | 400 | `invalid_address` | checkout with a `shipping_address_id` that isn't yours |
-| 409 | `insufficient_stock` | checkout when reserved+requested exceeds on-hand stock (message includes `variant_id`/`requested`/`available`) |
 | 409 | `not_cancellable` | cancelling an order past the cancellable status |
 | 500 | `internal_error` | unhandled server error |
 
@@ -104,7 +103,7 @@ All cart endpoints operate on the caller's one active cart — there's no cart I
 
 **`POST /cart/items`** — add an item. Body:
 ```ts
-{ variant_id: number, quantity: number }  // quantity must be > 0, and >= the product's min_order_quantity
+{ gift_box_slug: string, quantity: number }  // quantity must be > 0, and >= the gift box's own moq
 ```
 
 **`POST /cart/items/{item_id}/update`** — set an item's quantity. Body: `{ quantity: number }`.
@@ -116,20 +115,22 @@ All cart endpoints operate on the caller's one active cart — there's no cart I
 All four cart-mutation endpoints return the same shape as `/cart` (`200`, or `201` for add):
 ```ts
 { id: number, status: string | null, subtotal: string,  // Decimal-as-string, see Conventions
-  items: Array<{ id: number, variant_id: number | null, sku: string | null,
+  items: Array<{ id: number, gift_box_slug: string | null, name: string | null,
+                 image_url: string | null, alt_text: string | null,
                  quantity: number | null, unit_price: string | null, line_total: string | null }> }
 ```
 
 ### Orders
 
-**`POST /checkout`** — atomically create an order from the active cart and reserve stock.
+**`POST /checkout`** — atomically create an order from the active cart. Cart items are gift
+boxes, not stock-tracked variants, so this does not reserve inventory (deferred follow-up).
 Body: `{ shipping_address_id: number }`.
 
 Response `201`:
 ```ts
 { order_id: number, order_number: string, total_amount: string }
 ```
-Errors: `empty_cart` (400), `invalid_address` (400), `insufficient_stock` (409).
+Errors: `empty_cart` (400), `invalid_address` (400).
 
 **`POST /orders`** — list the caller's orders. No body.
 
@@ -145,7 +146,7 @@ Response `200`:
 ```ts
 type OrderDetail = OrderSummary & {
   shipping_address_id: number | null,
-  items: Array<{ id: number, product_id: number | null, variant_id: number | null,
+  items: Array<{ id: number, gift_box_slug: string | null, name: string | null,
                  quantity: number | null, unit_price: string | null }>,
   invoice: { id: number, invoice_number: string | null, invoice_url: string | null,
              gst_amount: string | null, total_amount: string | null } | null,

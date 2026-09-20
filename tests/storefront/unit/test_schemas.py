@@ -21,11 +21,13 @@ def test_decimal_round_trips_through_json():
 
 def test_positive_int_constraint_is_enforced():
     with pytest.raises(msgspec.ValidationError):
-        msgspec.json.decode(b'{"variant_id": 1, "quantity": 0}', type=AddCartItemRequest)
+        msgspec.json.decode(b'{"gift_box_slug": "first-light", "quantity": 0}', type=AddCartItemRequest)
 
 
 def test_positive_int_constraint_allows_positive_values():
-    parsed = msgspec.json.decode(b'{"variant_id": 1, "quantity": 3}', type=AddCartItemRequest)
+    parsed = msgspec.json.decode(
+        b'{"gift_box_slug": "first-light", "quantity": 3}', type=AddCartItemRequest
+    )
     assert parsed.quantity == 3
 
 

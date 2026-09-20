@@ -78,8 +78,11 @@ def _get_order(event: dict) -> dict:
         payment_status=order.payment_status, total_amount=order.total_amount,
         created_at=order.created_at, shipping_address_id=order.shipping_address_id,
         items=[
-            OrderItemResponse(id=i.id, product_id=i.product_id, variant_id=i.variant_id,
-                               quantity=i.quantity, unit_price=i.unit_price)
+            OrderItemResponse(
+                id=i.id, gift_box_slug=i.gift_box.slug if i.gift_box else None,
+                name=i.gift_box.name if i.gift_box else None,
+                quantity=i.quantity, unit_price=i.unit_price,
+            )
             for i in items
         ],
         invoice=(InvoiceResponse(

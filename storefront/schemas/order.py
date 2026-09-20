@@ -12,8 +12,8 @@ class CheckoutRequest(msgspec.Struct, kw_only=True):
 
 class OrderItemResponse(msgspec.Struct, kw_only=True):
     id: int
-    product_id: int | None = None
-    variant_id: int | None = None
+    gift_box_slug: str | None = None
+    name: str | None = None
     quantity: int | None = None
     unit_price: Decimal | None = None
 

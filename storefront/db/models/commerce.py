@@ -2,12 +2,11 @@
 the SQLAlchemy original) aren't touched by any in-scope repo/service and are skipped."""
 from __future__ import annotations
 
-from peewee import CharField, DateTimeField, DecimalField, ForeignKeyField, IntegerField, TextField
-
 from db.models.base import BaseModel, CreatedAtMixin
-from db.models.catalog import Product, ProductVariant
+from db.models.catalog import GiftBox, Product, ProductVariant
 from db.models.storefront import Address
 from db.models.users import User
+from peewee import CharField, DateTimeField, DecimalField, ForeignKeyField, IntegerField, TextField
 
 
 class Order(CreatedAtMixin):
@@ -31,10 +30,13 @@ class OrderItem(BaseModel):
         table_name = "order_items"
 
     order = ForeignKeyField(Order, backref="items", column_name="order_id", null=True)
+    # product/variant are unused going forward — GiftBox is the sellable unit now (below). Left in
+    # place rather than dropped since no migration removes the columns.
     product = ForeignKeyField(Product, backref="order_items", column_name="product_id", null=True)
+    variant = ForeignKeyField(ProductVariant, backref="order_items", column_name="variant_id", null=True)
+    gift_box = ForeignKeyField(GiftBox, backref="order_items", column_name="gift_box_id", null=True)
     quantity = IntegerField(null=True)
     unit_price = DecimalField(max_digits=12, decimal_places=2, null=True)
-    variant = ForeignKeyField(ProductVariant, backref="order_items", column_name="variant_id", null=True)
 
 
 class Payment(BaseModel):

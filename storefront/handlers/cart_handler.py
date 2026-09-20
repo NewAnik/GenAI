@@ -1,15 +1,16 @@
 """Cart endpoints (all require auth): view the active cart and add/update/remove items.
-Adding an item snapshots the current variant price and enforces the product's
-`min_order_quantity`."""
+Adding an item snapshots the current gift box's selling price and enforces its `moq`."""
 from __future__ import annotations
 
 from decimal import Decimal
 
 from db.database import connection
 from db.repositories.cart_repo import CartRepository
+from db.repositories.catalog_repo import CatalogRepository
 from handlers.common.auth import get_current_user
 from handlers.common.errors import NotFoundError, ValidationError
 from handlers.common.http import decode_body, json_response
+from handlers.common.media import resolve_catalog_image_url
 from handlers.common.router import dispatch
 from schemas.cart import (
     AddCartItemRequest,
@@ -19,18 +20,28 @@ from schemas.cart import (
 )
 
 _repo = CartRepository()
+_catalog_repo = CatalogRepository()
 
 
 def _serialize(cart) -> CartResponse:
+    items_raw = _repo.items_for(cart)
+    hero_by_box = _catalog_repo.hero_image_by_gift_box(
+        [i.gift_box_id for i in items_raw if i.gift_box_id is not None]
+    )
+
     items: list[CartItemResponse] = []
     subtotal = Decimal("0")
-    for item in _repo.items_for(cart):
+    for item in items_raw:
         unit_price = item.unit_price_snapshot or Decimal("0")
         line_total = unit_price * (item.quantity or 0)
         subtotal += line_total
+        box = item.gift_box
+        hero = hero_by_box.get(item.gift_box_id) if item.gift_box_id else None
         items.append(CartItemResponse(
-            id=item.id, variant_id=item.variant_id,
-            sku=item.variant.sku if item.variant else None,
+            id=item.id, gift_box_slug=box.slug if box else None,
+            name=box.name if box else None,
+            image_url=resolve_catalog_image_url(hero.image_url if hero else None),
+            alt_text=hero.alt_text if hero else None,
             quantity=item.quantity, unit_price=unit_price, line_total=line_total,
         ))
     return CartResponse(id=cart.id, status=cart.status, items=items, subtotal=subtotal)
@@ -46,23 +57,22 @@ def _add_item(event: dict) -> dict:
     user = get_current_user(event)
     payload = decode_body(event, AddCartItemRequest)
 
-    variant = _repo.get_variant(payload.variant_id)
-    if variant is None:
-        raise NotFoundError("variant not found")
+    gift_box = _catalog_repo.get_gift_box_by_slug(payload.gift_box_slug)
+    if gift_box is None:
+        raise NotFoundError("gift box not found")
 
-    min_qty = variant.product.min_order_quantity if variant.product else None
-    if min_qty and payload.quantity < min_qty:
-        raise ValidationError(f"minimum order quantity for this product is {min_qty}")
+    if gift_box.moq and payload.quantity < gift_box.moq:
+        raise ValidationError(f"minimum order quantity for this box is {gift_box.moq}")
 
     cart = _repo.get_or_create_active(user.id)
-    existing = next((i for i in _repo.items_for(cart) if i.variant_id == payload.variant_id), None)
+    existing = next((i for i in _repo.items_for(cart) if i.gift_box_id == gift_box.id), None)
     if existing is not None:
         existing.quantity = (existing.quantity or 0) + payload.quantity
         existing.save()
     else:
         _repo.add_item(
-            cart_id=cart.id, variant_id=payload.variant_id, quantity=payload.quantity,
-            unit_price_snapshot=variant.price or Decimal("0"),
+            cart_id=cart.id, gift_box_id=gift_box.id, quantity=payload.quantity,
+            unit_price_snapshot=gift_box.selling_price or Decimal("0"),
         )
 
     cart = _repo.get_or_create_active(user.id)
