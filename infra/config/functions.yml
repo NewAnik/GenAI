@@ -88,3 +88,10 @@ functions:
       - method: POST
         path: /webhooks/payments
         auth: none
+
+  catalog:
+    handler: storefront/handlers/catalog_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /catalog/gift-boxes
+        auth: none

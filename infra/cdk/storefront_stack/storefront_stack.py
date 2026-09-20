@@ -30,6 +30,14 @@ Expects these CDK context values (pass via `-c key=value`, or cdk.context.json):
   dbName      - the database name to connect to.
                Both passed as plain (non-secret) Lambda env vars — see storefront/config.py.
 
+Optionally, `catalogImagesCdnDomain` (the admin app's CatalogImagesCdn CloudFront domain — see
+GenAI/infra/cdk/admin_api_stack/admin_api_stack.py's CfnOutput of the same name) is passed as
+`CATALOG_IMAGES_CDN_DOMAIN` to the `catalog` function only (see `_build_function`), so it can
+resolve gift_box_images' relative object keys into full URLs. A non-secret, effectively-static
+domain name — a plain context value rather than a CDK cross-stack reference, same tradeoff
+`dbHost`/`dbName` already accept, and it avoids adding a first-ever dependency edge between this
+stack and AdminApiStack.
+
 Optionally, `apiDomainName` + `apiCertificateArn` context values attach a custom domain to the
 REST API with `SecurityPolicy: TLS_1_2` (the AWS-recommended minimum — the default
 `*.execute-api.<region>.amazonaws.com` endpoint already enforces TLS 1.2 on AWS's side with no
@@ -188,6 +196,10 @@ class StorefrontStack(Stack):
             environment["DEFAULT_WAREHOUSE_ID"] = str(fn_config.default_warehouse_id)
         if fn_config.payment_webhook_secret_arn is not None:
             environment["PAYMENT_WEBHOOK_SECRET_ARN"] = fn_config.payment_webhook_secret_arn
+        if fn_config.name == "catalog":
+            cdn_domain = self.node.try_get_context("catalogImagesCdnDomain")
+            if cdn_domain:
+                environment["CATALOG_IMAGES_CDN_DOMAIN"] = cdn_domain
 
         # `vpc: false` in functions.yml opts a function out of the VPC entirely. Only safe for
         # functions that don't need DB_SECRET_ARN's Postgres access — there's no NAT gateway on

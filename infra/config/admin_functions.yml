@@ -1,0 +1,101 @@
+# Declarative Lambda/route config for the admin API — admin_api_stack.py reads this and loops
+# over it to build the Lambdas + API Gateway routes, parallel to functions.yml for the storefront.
+#
+# Every route is POST, same convention as the storefront API (see functions.yml's header comment):
+# uniform authorizer wiring, every request body-driven.
+#
+# Routes are block-style (`- method: ...` / `path: ...`), not `{method: ..., path: ...}` flow
+# mappings — a path template segment like `{table}` is unambiguous as plain scalar text in block
+# style, but inside a flow mapping YAML tries to parse `{table}` as a nested mapping and fails
+# (this bit functions.yml's own routes too if written that way; block style is what that file
+# actually uses, and what avoids the ambiguity here).
+#
+# `auth: cognito` attaches the shared CognitoUserPoolsAuthorizer bound to the Admin User Pool
+# (see admin_cognito_stack.py) — every route here requires it; there is no public/unauthenticated
+# admin route. `groups:` is documentation only (see admin_functions_config.py's docstring) — real
+# authorization for the generic `/resources/{table}/...` family lives in
+# admin_api/config/resources.yml's per-table `*_groups` lists, and for bespoke endpoints inside
+# each handler via admin_api/handlers/common/auth.py's `require_role`.
+#
+# `vpc: false` opts a function out of the VPC entirely (no NAT gateway on this VPC — see
+# network_stack.py) — not used here, since every admin function needs Postgres.
+
+functions:
+  resource:
+    handler: admin_api/handlers/resource_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /resources/{table}/list
+        auth: cognito
+      - method: POST
+        path: /resources/{table}/detail
+        auth: cognito
+      - method: POST
+        path: /resources/{table}/related
+        auth: cognito
+      - method: POST
+        path: /resources/{table}/lookup
+        auth: cognito
+      - method: POST
+        path: /resources/{table}/create
+        auth: cognito
+      - method: POST
+        path: /resources/{table}/{id}/update
+        auth: cognito
+      - method: POST
+        path: /resources/{table}/{id}/delete
+        auth: cognito
+
+  auth:
+    handler: admin_api/handlers/auth_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /auth/me
+        auth: cognito
+
+  dashboard:
+    handler: admin_api/handlers/dashboard_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /dashboard/summary
+        auth: cognito
+
+  quotes:
+    handler: admin_api/handlers/quotes_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /quotes/{quote_id}/convert
+        auth: cognito
+
+  offers:
+    handler: admin_api/handlers/offers_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /offers/{offer_id}/match-count
+        auth: cognito
+      - method: POST
+        path: /offers/{offer_id}/scope/list
+        auth: cognito
+      - method: POST
+        path: /offers/{offer_id}/scope/attach
+        auth: cognito
+      - method: POST
+        path: /offers/{offer_id}/scope/detach
+        auth: cognito
+
+  campaigns:
+    handler: admin_api/handlers/campaigns_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /campaigns/{campaign_id}/recipients/import
+        auth: cognito
+
+  images:
+    handler: admin_api/handlers/images_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /images/presign-upload
+        auth: cognito
+      - method: POST
+        path: /images/delete
+        auth: cognito

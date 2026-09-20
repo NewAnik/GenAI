@@ -16,8 +16,9 @@ configured. All paths below are relative to that base.
 
 ## Auth
 
-Every endpoint except the payment webhook requires a Cognito **ID token** (not access token —
-the Lambdas read the `email`/custom claims off it) in the `Authorization` header:
+Every endpoint except the payment webhook and the catalog endpoint requires a Cognito **ID
+token** (not access token — the Lambdas read the `email`/custom claims off it) in the
+`Authorization` header:
 
 ```
 Authorization: Bearer <cognito-id-token>
@@ -187,5 +188,25 @@ Response `201`:
 ```
 
 **`POST /webhooks/payments`** — **not called by the frontend.** Server-to-server only, HMAC-signed
-(`X-Signature-256`) by the payment provider; the only route with `auth: none`. Listed here only
-so its existence in the route table isn't a surprise.
+(`X-Signature-256`) by the payment provider; one of only two routes with `auth: none` (the other
+is the catalog endpoint below). Listed here only so its existence in the route table isn't a
+surprise.
+
+### Catalog
+
+**`POST /catalog/gift-boxes`** — `auth: none`, the only other unauthenticated route. Backs the
+public site's product grid (replaces `wrapped-and-more/src/content/products.ts`'s hardcoded
+array). No body. Only returns boxes with both a `slug` and a `collection` set — a box missing
+either is treated as not catalog-ready and left out.
+
+Response `200`: `Array<GiftBoxSummary>` where
+```ts
+type GiftBoxSummary = {
+  slug: string, name: string, collection: string, occasions: string[],
+  selling_price: string,  // Decimal-as-string, see Conventions
+  moq: number | null, description: string | null,
+  contents: string,       // joined from gift_box_items, e.g. "1 x Cashew jar, 2 x Clay diya"
+  image_url: string | null,  // already a full CDN URL, never a bare object key
+  alt_text: string | null,
+}
+```

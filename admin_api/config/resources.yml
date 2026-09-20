@@ -1,0 +1,776 @@
+# Server-side mirror of wrapped-and-more-admin/src/resources/*.ts's ResourceConfig — the
+# allow-list every generic /resources/{table}/... request is validated against (see
+# admin_api/services/resource_registry.py's module docstring). Default-deny: a table absent here
+# is unreachable through the API.
+#
+# `offer_products` and `offer_categories` (composite primary keys) are deliberately NOT declared
+# here — they're reachable only through admin_api/handlers/offers_handler.py's bespoke
+# scope/attach and scope/detach endpoints.
+#
+# Column `type:` drives the SQL cast a filter/range value is bound with (db/query_types.py) —
+# get it right for every column that appears in `filterable` or `sortable` below; it matters far
+# less for a column that's only ever read/written by primary key.
+#
+# `*_groups` mirror wrapped-and-more-admin's STAFF_ROLES ([super_admin, admin, ops, sales]) and
+# OWNER_ROLES ([super_admin, admin]) from src/lib/enums.ts. An empty list is an unconditional deny
+# (see services/auth_service.py's require_group) — how "no one may write this through the API" is
+# expressed for audit_logs, offer_redemptions' update/delete, and the two read-only
+# system/ML-pipeline-owned tables (recommendation_logs, product_embeddings).
+
+staff: &staff [super_admin, admin, ops, sales]
+owner: &owner [super_admin, admin]
+none: &none []
+
+resources:
+  # --- Catalog ---------------------------------------------------------------
+
+  products:
+    table: products
+    columns:
+      - {name: id, type: integer}
+      - {name: category_id, type: integer, writable: true}
+      - {name: name, type: text, writable: true, required: true}
+      - {name: description, type: text, writable: true}
+      - {name: brand, type: text, writable: true}
+      - {name: base_price, type: numeric, writable: true}
+      - {name: min_order_quantity, type: integer, writable: true}
+      - {name: is_customizable, type: boolean, writable: true}
+      - {name: status, type: text, writable: true, required: true}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    relations:
+      - {name: category, table: categories, local_key: category_id, columns: [id, name]}
+    searchable: [name, brand, description]
+    filterable: [status, category_id, is_customizable]
+    sortable: [name, brand, base_price, min_order_quantity, status, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  product_variants:
+    table: product_variants
+    columns:
+      - {name: id, type: integer}
+      - {name: product_id, type: integer, writable: true, required: true}
+      - {name: sku, type: text, writable: true, required: true}
+      - {name: color, type: text, writable: true}
+      - {name: size, type: text, writable: true}
+      - {name: price, type: numeric, writable: true}
+      - {name: created_at, type: timestamp}
+    relations:
+      - {name: product, table: products, local_key: product_id, columns: [id, name]}
+    searchable: [sku, color, size]
+    filterable: [product_id]
+    sortable: [sku, color, size, price, id]
+    default_sort: {column: id, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  product_images:
+    table: product_images
+    columns:
+      - {name: id, type: integer}
+      - {name: product_id, type: integer, writable: true, required: true}
+      - {name: image_url, type: text, writable: true, required: true}
+      - {name: alt_text, type: text, writable: true}
+      - {name: width, type: integer, writable: true}
+      - {name: height, type: integer, writable: true}
+      - {name: display_order, type: integer, writable: true}
+    relations:
+      - {name: product, table: products, local_key: product_id, columns: [id, name]}
+    searchable: [image_url]
+    filterable: [product_id]
+    sortable: [display_order, product_id]
+    default_sort: {column: product_id, ascending: true}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  categories:
+    table: categories
+    columns:
+      - {name: id, type: integer}
+      - {name: parent_id, type: integer, writable: true}
+      - {name: name, type: text, writable: true, required: true}
+      - {name: slug, type: text, writable: true, required: true}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    relations:
+      - {name: parent, table: categories, local_key: parent_id, columns: [id, name]}
+    searchable: [name, slug]
+    filterable: [parent_id]
+    sortable: [name, slug, created_at]
+    default_sort: {column: name, ascending: true}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  gift_boxes:
+    table: gift_boxes
+    columns:
+      - {name: id, type: integer}
+      - {name: name, type: text, writable: true, required: true}
+      - {name: slug, type: text, writable: true, required: true}
+      - {name: collection, type: text, writable: true, required: true}
+      - {name: occasions, type: text_array, writable: true}
+      - {name: moq, type: integer, writable: true}
+      - {name: description, type: text, writable: true}
+      - {name: selling_price, type: numeric, writable: true}
+    searchable: [name, description, slug]
+    filterable: [collection]
+    sortable: [name, selling_price, moq, collection]
+    default_sort: {column: name, ascending: true}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  gift_box_items:
+    table: gift_box_items
+    columns:
+      - {name: id, type: integer}
+      - {name: gift_box_id, type: integer, writable: true, required: true}
+      - {name: product_id, type: integer, writable: true, required: true}
+      - {name: quantity, type: integer, writable: true, required: true}
+    relations:
+      - {name: gift_box, table: gift_boxes, local_key: gift_box_id, columns: [id, name]}
+      - {name: product, table: products, local_key: product_id, columns: [id, name]}
+    searchable: []
+    filterable: [gift_box_id]
+    sortable: [gift_box_id, quantity]
+    default_sort: {column: gift_box_id, ascending: true}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  gift_box_images:
+    table: gift_box_images
+    columns:
+      - {name: id, type: integer}
+      - {name: gift_box_id, type: integer, writable: true, required: true}
+      - {name: image_url, type: text, writable: true, required: true}
+      - {name: alt_text, type: text, writable: true}
+      - {name: width, type: integer, writable: true}
+      - {name: height, type: integer, writable: true}
+      - {name: display_order, type: integer, writable: true}
+      - {name: created_at, type: timestamp}
+    relations:
+      - {name: gift_box, table: gift_boxes, local_key: gift_box_id, columns: [id, name]}
+    searchable: [image_url, alt_text]
+    filterable: [gift_box_id]
+    sortable: [display_order, gift_box_id]
+    default_sort: {column: gift_box_id, ascending: true}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  # --- Offers ------------------------------------------------------------------
+
+  offers:
+    table: offers
+    columns:
+      - {name: id, type: integer}
+      - {name: code, type: text, writable: true}
+      - {name: name, type: text, writable: true, required: true}
+      - {name: description, type: text, writable: true}
+      - {name: discount_type, type: text, writable: true, required: true}
+      - {name: discount_value, type: numeric, writable: true}
+      - {name: max_discount_amount, type: numeric, writable: true}
+      - {name: min_order_amount, type: numeric, writable: true}
+      - {name: min_order_quantity, type: integer, writable: true}
+      - {name: applies_to, type: text, writable: true, required: true}
+      - {name: scope, type: text, writable: true, required: true}
+      - {name: organization_id, type: integer, writable: true}
+      - {name: starts_at, type: timestamp, writable: true, required: true}
+      - {name: ends_at, type: timestamp, writable: true}
+      - {name: usage_limit, type: integer, writable: true}
+      - {name: usage_limit_per_org, type: integer, writable: true}
+      - {name: usage_count, type: integer}
+      - {name: stackable, type: boolean, writable: true}
+      - {name: status, type: text, writable: true, required: true}
+      - {name: created_by, type: integer}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    relations:
+      - {name: organization, table: org, local_key: organization_id, columns: [id, name]}
+    searchable: [name, code, description]
+    filterable: [status, discount_type, scope, organization_id]
+    sortable: [name, code, ends_at, status, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  offer_redemptions:
+    table: offer_redemptions
+    columns:
+      - {name: id, type: integer}
+      - {name: offer_id, type: integer, writable: true, required: true}
+      - {name: order_id, type: integer, writable: true, required: true}
+      - {name: organization_id, type: integer, writable: true, required: true}
+      - {name: discount_amount, type: numeric, writable: true, required: true}
+      - {name: redeemed_at, type: timestamp}
+    relations:
+      - {name: offer, table: offers, local_key: offer_id, columns: [id, name, code]}
+      - {name: order, table: orders, local_key: order_id, columns: [id, order_number]}
+      - {name: organization, table: org, local_key: organization_id, columns: [id, name]}
+    searchable: []
+    filterable: [offer_id, organization_id]
+    sortable: [redeemed_at, discount_amount]
+    default_sort: {column: redeemed_at, ascending: false}
+    read_groups: *staff
+    # Insert-only, immutable: written once when a redemption happens, never edited or removed.
+    create_groups: *staff
+    update_groups: *none
+    delete_groups: *none
+    audited: false
+
+  # --- Sales ---------------------------------------------------------------
+
+  leads:
+    table: leads
+    columns:
+      - {name: id, type: integer}
+      - {name: company_name, type: text, writable: true, required: true}
+      - {name: contact_person, type: text, writable: true}
+      - {name: email, type: text, writable: true}
+      - {name: phone, type: text, writable: true}
+      - {name: lead_source, type: text, writable: true}
+      - {name: status, type: text, writable: true, required: true}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    searchable: [company_name, contact_person, email, phone]
+    filterable: [status]
+    sortable: [company_name, contact_person, status, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  lead_activities:
+    table: lead_activities
+    columns:
+      - {name: id, type: integer}
+      - {name: lead_id, type: integer, writable: true, required: true}
+      - {name: activity_type, type: text, writable: true, required: true}
+      - {name: notes, type: text, writable: true}
+      - {name: created_by, type: integer, writable: true}
+      - {name: created_at, type: timestamp}
+    relations:
+      - {name: lead, table: leads, local_key: lead_id, columns: [id, company_name]}
+      - {name: author, table: users, local_key: created_by, columns: [id, first_name, last_name]}
+    searchable: [notes, activity_type]
+    filterable: [lead_id]
+    sortable: [activity_type, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  quotes:
+    table: quotes
+    columns:
+      - {name: id, type: integer}
+      - {name: organization_id, type: integer, writable: true, required: true}
+      - {name: quote_number, type: text, writable: true, required: true}
+      - {name: status, type: text, writable: true, required: true}
+      - {name: total_amount, type: numeric, writable: true}
+      - {name: created_by, type: integer, writable: true}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    relations:
+      - {name: organization, table: org, local_key: organization_id, columns: [id, name]}
+      - {name: author, table: users, local_key: created_by, columns: [id, first_name, last_name]}
+    searchable: [quote_number]
+    filterable: [status, organization_id]
+    sortable: [quote_number, total_amount, status, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  quote_items:
+    table: quote_items
+    columns:
+      - {name: id, type: integer}
+      - {name: quote_id, type: integer, writable: true, required: true}
+      - {name: product_id, type: integer, writable: true, required: true}
+      - {name: quantity, type: integer, writable: true, required: true}
+      - {name: unit_price, type: numeric, writable: true, required: true}
+    relations:
+      - {name: quote, table: quotes, local_key: quote_id, columns: [id, quote_number]}
+      - {name: product, table: products, local_key: product_id, columns: [id, name]}
+    searchable: []
+    filterable: [quote_id]
+    sortable: [quote_id, quantity, unit_price]
+    default_sort: {column: quote_id, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  campaigns:
+    table: campaigns
+    columns:
+      - {name: id, type: integer}
+      - {name: organization_id, type: integer, writable: true, required: true}
+      - {name: campaign_name, type: text, writable: true, required: true}
+      - {name: budget, type: numeric, writable: true}
+      - {name: employee_count, type: integer, writable: true}
+      - {name: event_type, type: text, writable: true}
+      - {name: start_date, type: date, writable: true}
+      - {name: status, type: text, writable: true, required: true}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    relations:
+      - {name: organization, table: org, local_key: organization_id, columns: [id, name]}
+    searchable: [campaign_name, event_type]
+    filterable: [status, organization_id]
+    sortable: [campaign_name, event_type, employee_count, budget, start_date, status]
+    default_sort: {column: start_date, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  campaign_recipients:
+    table: campaign_recipients
+    columns:
+      - {name: id, type: integer}
+      - {name: campaign_id, type: integer, writable: true, required: true}
+      - {name: employee_name, type: text, writable: true, required: true}
+      - {name: employee_email, type: text, writable: true}
+      - {name: address, type: text, writable: true}
+      - {name: city, type: text, writable: true}
+      - {name: state, type: text, writable: true}
+      - {name: pincode, type: text, writable: true}
+    relations:
+      - {name: campaign, table: campaigns, local_key: campaign_id, columns: [id, campaign_name]}
+    searchable: [employee_name, employee_email, city, pincode]
+    filterable: [campaign_id]
+    sortable: [employee_name, city, id]
+    default_sort: {column: id, ascending: true}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  branding_requests:
+    table: branding_requests
+    columns:
+      - {name: id, type: integer}
+      - {name: quote_id, type: integer, writable: true, required: true}
+      - {name: logo_asset_id, type: integer, writable: true}
+      - {name: branding_type, type: text, writable: true}
+      - {name: notes, type: text, writable: true}
+      - {name: approval_status, type: text, writable: true, required: true}
+      - {name: created_at, type: timestamp}
+    relations:
+      - {name: quote, table: quotes, local_key: quote_id, columns: [id, quote_number, organization_id]}
+      - {name: logo_asset, table: logo_assets, local_key: logo_asset_id, columns: [id, file_url, file_type]}
+    searchable: [branding_type, notes]
+    filterable: [approval_status, quote_id]
+    sortable: [branding_type, approval_status, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  logo_assets:
+    table: logo_assets
+    columns:
+      - {name: id, type: integer}
+      - {name: organization_id, type: integer, writable: true, required: true}
+      - {name: file_url, type: text, writable: true, required: true}
+      - {name: file_type, type: text, writable: true}
+      - {name: uploaded_at, type: timestamp}
+    relations:
+      - {name: organization, table: org, local_key: organization_id, columns: [id, name]}
+    searchable: [file_url, file_type]
+    filterable: [organization_id]
+    sortable: [file_type, uploaded_at]
+    default_sort: {column: uploaded_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  # --- Orders ---------------------------------------------------------------
+
+  orders:
+    table: orders
+    columns:
+      - {name: id, type: integer}
+      - {name: organization_id, type: integer, writable: true, required: true}
+      - {name: quote_id, type: integer, writable: true}
+      - {name: order_number, type: text, writable: true, required: true}
+      - {name: status, type: text, writable: true, required: true}
+      - {name: offer_id, type: integer, writable: true}
+      - {name: subtotal_amount, type: numeric, writable: true}
+      - {name: discount_amount, type: numeric, writable: true}
+      - {name: tax_amount, type: numeric, writable: true}
+      - {name: shipping_amount, type: numeric, writable: true}
+      - {name: total_amount, type: numeric, writable: true, required: true}
+      - {name: shipping_address, type: text, writable: true}
+      - {name: shipping_city, type: text, writable: true}
+      - {name: shipping_state, type: text, writable: true}
+      - {name: shipping_pincode, type: text, writable: true}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    relations:
+      - {name: organization, table: org, local_key: organization_id, columns: [id, name]}
+      - {name: quote, table: quotes, local_key: quote_id, columns: [id, quote_number]}
+      - {name: offer, table: offers, local_key: offer_id, columns: [id, name, code]}
+    searchable: [order_number, shipping_city]
+    filterable: [status, organization_id]
+    sortable: [order_number, status, subtotal_amount, discount_amount, total_amount, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    # Orders carry payments and invoices — cancel them, never delete them (matches the
+    # frontend's ResourceConfig.noDelete on this table).
+    delete_groups: *none
+    audited: true
+
+  order_items:
+    table: order_items
+    columns:
+      - {name: id, type: integer}
+      - {name: order_id, type: integer, writable: true, required: true}
+      - {name: product_id, type: integer, writable: true, required: true}
+      - {name: quantity, type: integer, writable: true, required: true}
+      - {name: unit_price, type: numeric, writable: true, required: true}
+    relations:
+      - {name: order, table: orders, local_key: order_id, columns: [id, order_number]}
+      - {name: product, table: products, local_key: product_id, columns: [id, name]}
+    searchable: []
+    filterable: [order_id]
+    sortable: [order_id, quantity, unit_price]
+    default_sort: {column: order_id, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  payments:
+    table: payments
+    columns:
+      - {name: id, type: integer}
+      - {name: order_id, type: integer, writable: true, required: true}
+      - {name: payment_method, type: text, writable: true, required: true}
+      - {name: payment_status, type: text, writable: true, required: true}
+      - {name: transaction_reference, type: text, writable: true}
+      - {name: amount, type: numeric, writable: true, required: true}
+      - {name: paid_at, type: timestamp, writable: true}
+    relations:
+      - {name: order, table: orders, local_key: order_id, columns: [id, order_number, organization_id]}
+    searchable: [transaction_reference, payment_method]
+    filterable: [payment_status, order_id]
+    sortable: [payment_method, amount, payment_status, paid_at]
+    default_sort: {column: paid_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *none
+    audited: true
+
+  invoices:
+    table: invoices
+    columns:
+      - {name: id, type: integer}
+      - {name: order_id, type: integer, writable: true, required: true}
+      - {name: invoice_number, type: text, writable: true, required: true}
+      - {name: invoice_url, type: text, writable: true}
+      - {name: gst_amount, type: numeric, writable: true}
+      - {name: total_amount, type: numeric, writable: true, required: true}
+      - {name: generated_at, type: timestamp}
+    relations:
+      - {name: order, table: orders, local_key: order_id, columns: [id, order_number, organization_id]}
+    searchable: [invoice_number]
+    filterable: [order_id]
+    sortable: [invoice_number, gst_amount, total_amount, generated_at]
+    default_sort: {column: generated_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *none
+    audited: true
+
+  shipments:
+    table: shipments
+    columns:
+      - {name: id, type: integer}
+      - {name: order_id, type: integer, writable: true, required: true}
+      - {name: courier_name, type: text, writable: true}
+      - {name: tracking_number, type: text, writable: true}
+      - {name: shipment_status, type: text, writable: true, required: true}
+      - {name: shipped_at, type: timestamp, writable: true}
+      - {name: delivered_at, type: timestamp, writable: true}
+    relations:
+      - {name: order, table: orders, local_key: order_id, columns: [id, order_number, shipping_city]}
+    searchable: [tracking_number, courier_name]
+    filterable: [shipment_status, order_id]
+    sortable: [courier_name, shipment_status, shipped_at, delivered_at]
+    default_sort: {column: shipped_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  # --- Inventory ---------------------------------------------------------------
+
+  warehouses:
+    table: warehouses
+    columns:
+      - {name: id, type: integer}
+      - {name: name, type: text, writable: true, required: true}
+      - {name: address, type: text, writable: true}
+      - {name: city, type: text, writable: true}
+      - {name: state, type: text, writable: true}
+      - {name: created_at, type: timestamp}
+    searchable: [name, city, state]
+    filterable: []
+    sortable: [name, city, state]
+    default_sort: {column: name, ascending: true}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  inventory:
+    table: inventory
+    columns:
+      - {name: id, type: integer}
+      - {name: warehouse_id, type: integer, writable: true, required: true}
+      - {name: variant_id, type: integer, writable: true, required: true}
+      - {name: quantity, type: integer, writable: true, required: true}
+      - {name: reserved_quantity, type: integer, writable: true}
+      - {name: updated_at, type: timestamp}
+    relations:
+      - {name: warehouse, table: warehouses, local_key: warehouse_id, columns: [id, name]}
+      - {name: variant, table: product_variants, local_key: variant_id, columns: [id, sku, color, size]}
+    searchable: []
+    filterable: [warehouse_id, variant_id]
+    sortable: [quantity, reserved_quantity, updated_at]
+    default_sort: {column: updated_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  suppliers:
+    table: suppliers
+    columns:
+      - {name: id, type: integer}
+      - {name: name, type: text, writable: true, required: true}
+      - {name: contact_person, type: text, writable: true}
+      - {name: email, type: text, writable: true}
+      - {name: phone, type: text, writable: true}
+      - {name: gst_number, type: text, writable: true}
+      - {name: created_at, type: timestamp}
+    searchable: [name, contact_person, email, gst_number]
+    filterable: []
+    sortable: [name, contact_person]
+    default_sort: {column: name, ascending: true}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  supplier_products:
+    table: supplier_products
+    columns:
+      - {name: id, type: integer}
+      - {name: supplier_id, type: integer, writable: true, required: true}
+      - {name: product_id, type: integer, writable: true, required: true}
+      - {name: supplier_price, type: numeric, writable: true}
+      - {name: lead_time_days, type: integer, writable: true}
+    relations:
+      - {name: supplier, table: suppliers, local_key: supplier_id, columns: [id, name]}
+      - {name: product, table: products, local_key: product_id, columns: [id, name, base_price]}
+    searchable: []
+    filterable: [supplier_id]
+    sortable: [supplier_price, lead_time_days, supplier_id]
+    default_sort: {column: supplier_id, ascending: true}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  # --- People ---------------------------------------------------------------
+
+  org:
+    table: org
+    columns:
+      - {name: id, type: integer}
+      - {name: name, type: text, writable: true, required: true}
+      - {name: industry, type: text, writable: true}
+      - {name: company_size, type: text, writable: true}
+      - {name: website, type: text, writable: true}
+      - {name: gst_number, type: text, writable: true}
+      - {name: pan_number, type: text, writable: true}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    searchable: [name, industry, website, gst_number]
+    filterable: []
+    sortable: [name, industry, created_at]
+    default_sort: {column: name, ascending: true}
+    read_groups: *staff
+    create_groups: *owner
+    update_groups: *owner
+    delete_groups: *owner
+    audited: true
+
+  users:
+    table: users
+    primary_key: id
+    columns:
+      - {name: id, type: integer}
+      - {name: organization_id, type: integer, writable: true}
+      - {name: first_name, type: text, writable: true, required: true}
+      - {name: last_name, type: text, writable: true}
+      - {name: email, type: text, writable: true, required: true}
+      - {name: phone, type: text, writable: true}
+      # password_hash is intentionally never declared here — a column absent from this list
+      # can never be read or written through the API at all (see audit_service.py's separate,
+      # belt-and-suspenders redaction of the same column).
+      - {name: cognito_sub, type: text}
+      - {name: role, type: text, writable: true, required: true}
+      - {name: is_active, type: boolean, writable: true}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    relations:
+      - {name: organization, table: org, local_key: organization_id, columns: [id, name]}
+    searchable: [first_name, last_name, email, phone]
+    filterable: [role, is_active, organization_id]
+    sortable: [email, role, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    create_groups: *owner
+    update_groups: *owner
+    delete_groups: *owner
+    audited: true
+
+  # --- System ---------------------------------------------------------------
+
+  audit_logs:
+    table: audit_logs
+    columns:
+      - {name: id, type: integer}
+      - {name: entity_type, type: text}
+      - {name: entity_id, type: integer}
+      - {name: action, type: text}
+      - {name: old_value, type: jsonb}
+      - {name: new_value, type: jsonb}
+      - {name: performed_by, type: integer}
+      - {name: created_at, type: timestamp}
+    relations:
+      - {name: actor, table: users, local_key: performed_by, columns: [id, first_name, last_name, email]}
+    searchable: [entity_type, action]
+    filterable: [entity_type, performed_by]
+    sortable: [entity_type, entity_id, action, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    # Only admin_api/services/audit_service.py writes here (bypassing this generic path
+    # entirely) — the API itself never lets a client write an audit row directly.
+    create_groups: *none
+    update_groups: *none
+    delete_groups: *none
+    audited: false
+
+  conversation_sessions:
+    table: conversation_sessions
+    columns:
+      - {name: id, type: integer}
+      - {name: whatsapp_number, type: text, writable: true, required: true}
+      - {name: session_state, type: jsonb, writable: true}
+      - {name: created_at, type: timestamp}
+      - {name: updated_at, type: timestamp}
+    searchable: [whatsapp_number]
+    filterable: []
+    sortable: [whatsapp_number, created_at, updated_at]
+    default_sort: {column: updated_at, ascending: false}
+    read_groups: *staff
+    create_groups: *staff
+    update_groups: *staff
+    delete_groups: *staff
+    audited: true
+
+  recommendation_logs:
+    table: recommendation_logs
+    columns:
+      - {name: id, type: integer}
+      - {name: session_id, type: integer}
+      - {name: recommendation_json, type: jsonb}
+      - {name: created_at, type: timestamp}
+    relations:
+      - {name: session, table: conversation_sessions, local_key: session_id, columns: [id, whatsapp_number]}
+    searchable: []
+    filterable: [session_id]
+    sortable: [created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    # Written only by the WhatsApp agent's own pipeline (GenAI/app), never by hand.
+    create_groups: *none
+    update_groups: *none
+    delete_groups: *none
+    audited: false
+
+  product_embeddings:
+    table: product_embeddings
+    # No single-column id — keyed on product_id (mirrors the frontend's rowKey/noDetail on this
+    # resource). Update/delete are denied outright, so this only ever needs primary_key for the
+    # (unused) detail lookup path.
+    primary_key: product_id
+    columns:
+      - {name: product_id, type: integer}
+      - {name: embedding_id, type: text}
+      - {name: created_at, type: timestamp}
+    relations:
+      - {name: product, table: products, local_key: product_id, columns: [id, name]}
+    searchable: [embedding_id]
+    filterable: [product_id]
+    sortable: [embedding_id, created_at]
+    default_sort: {column: created_at, ascending: false}
+    read_groups: *staff
+    # Written only by GenAI/app/jobs/embed_products.py, never by hand.
+    create_groups: *none
+    update_groups: *none
+    delete_groups: *none
+    audited: false

@@ -32,6 +32,11 @@ class Settings:
     payment_webhook_secret: str | None
     gst_rate: float
     default_warehouse_id: int | None
+    # The admin app's public-read CloudFront distribution in front of its catalog-images S3
+    # bucket (see GenAI/infra/cdk/admin_api_stack/admin_api_stack.py's CatalogImagesCdn) — used
+    # only by the catalog function to resolve gift_box_images.image_url's relative object keys
+    # into full URLs. None for any function that doesn't set CATALOG_IMAGES_CDN_DOMAIN.
+    catalog_images_cdn_domain: str | None
     app_env: str
     log_level: str
 
@@ -80,6 +85,7 @@ def get_settings() -> Settings:
         payment_webhook_secret=_payment_webhook_secret(),
         gst_rate=float(os.environ.get("GST_RATE", "0.18")),
         default_warehouse_id=int(default_warehouse_id_raw) if default_warehouse_id_raw else None,
+        catalog_images_cdn_domain=os.environ.get("CATALOG_IMAGES_CDN_DOMAIN"),
         app_env=os.environ.get("APP_ENV", "production"),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
     )
