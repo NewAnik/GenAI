@@ -67,6 +67,13 @@ functions:
         path: /quotes/{quote_id}/convert
         auth: cognito
 
+  orders:
+    handler: admin_api/handlers/orders_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /orders/{order_id}/status
+        auth: cognito
+
   offers:
     handler: admin_api/handlers/offers_handler.lambda_handler
     routes:

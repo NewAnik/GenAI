@@ -19,32 +19,33 @@ def _synth() -> Template:
 
 def test_creates_one_lambda_per_resource():
     template = _synth()
-    # auth/cart/orders/payments — the Cognito trigger now lives in CognitoStack.
+    # auth/cart/orders/payments/catalog/addresses — the Cognito trigger now lives in CognitoStack.
     functions = template.find_resources("AWS::Lambda::Function")
-    assert len(functions) == 4
+    assert len(functions) == 6
 
 
 def test_creates_rest_api_with_expected_method_count():
     template = _synth()
     template.resource_count_is("AWS::ApiGateway::RestApi", 1)
-    # 6 (auth) + ... — one method per entry across all 4 functions in functions.yml. Filtered
-    # to AWS_PROXY integrations to exclude the MOCK-integration CORS preflight OPTIONS methods
+    # One method per route entry across every function in functions.yml. Filtered to AWS_PROXY
+    # integrations to exclude the MOCK-integration CORS preflight OPTIONS methods
     # default_cors_preflight_options adds to every resource (see test_every_resource_below).
     methods = template.find_resources(
         "AWS::ApiGateway::Method", {"Properties": {"Integration": {"Type": "AWS_PROXY"}}},
     )
-    assert len(methods) == 16
+    assert len(methods) == 19
 
 
 def test_webhook_route_has_no_authorizer():
     template = _synth()
-    # Only /webhooks/payments sets `auth: none` in functions.yml — filtered to AWS_PROXY so the
-    # (also AuthorizationType NONE) CORS preflight OPTIONS methods don't inflate this count.
+    # /webhooks/payments and /catalog/gift-boxes are the only `auth: none` routes in
+    # functions.yml — filtered to AWS_PROXY so the (also AuthorizationType NONE) CORS preflight
+    # OPTIONS methods don't inflate this count.
     methods = template.find_resources(
         "AWS::ApiGateway::Method",
         {"Properties": {"AuthorizationType": "NONE", "Integration": {"Type": "AWS_PROXY"}}},
     )
-    assert len(methods) == 1
+    assert len(methods) == 2
 
 
 def test_every_other_route_uses_cognito_authorizer():
@@ -53,16 +54,16 @@ def test_every_other_route_uses_cognito_authorizer():
         "AWS::ApiGateway::Method",
         {"Properties": {"AuthorizationType": "COGNITO_USER_POOLS", "AuthorizerId": Match.any_value()}},
     )
-    assert len(methods) == 15
+    assert len(methods) == 17
 
 
 def test_every_function_is_attached_to_the_vpc_by_default():
     template = _synth()
-    # functions.yml doesn't set `vpc: false` on anything today, so all 4 get VpcConfig.
+    # functions.yml doesn't set `vpc: false` on anything today, so all 6 get VpcConfig.
     functions = template.find_resources(
         "AWS::Lambda::Function", {"Properties": {"VpcConfig": Match.any_value()}},
     )
-    assert len(functions) == 4
+    assert len(functions) == 6
 
 
 def test_every_function_shares_the_one_dependencies_layer():
@@ -71,18 +72,19 @@ def test_every_function_shares_the_one_dependencies_layer():
     functions = template.find_resources(
         "AWS::Lambda::Function", {"Properties": {"Layers": Match.any_value()}},
     )
-    assert len(functions) == 4
+    assert len(functions) == 6
 
 
 def test_every_resource_gets_a_cors_preflight_options_method():
     template = _synth()
-    # One per unique resource path segment functions.yml's 16 routes expand into (intermediate
-    # segments like /orders and /orders/{order_id} count too, not just the 16 leaf routes) —
-    # see storefront_stack.py's module docstring for why CORS is needed at all here.
+    # One per unique resource path segment functions.yml's 19 routes expand into (intermediate
+    # segments like /orders and /orders/{order_id} count too, not just the leaf routes), plus the
+    # API's own root resource ("/") — see storefront_stack.py's module docstring for why CORS is
+    # needed at all here.
     options_methods = template.find_resources(
         "AWS::ApiGateway::Method", {"Properties": {"HttpMethod": "OPTIONS"}},
     )
-    assert len(options_methods) == 19
+    assert len(options_methods) == 24
 
 
 def test_cors_defaults_to_the_local_dev_origin_when_apiCorsOrigins_is_unset():

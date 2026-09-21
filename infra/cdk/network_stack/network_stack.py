@@ -83,6 +83,16 @@ class NetworkStack(Stack):
             subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
             security_groups=[self.vpc_endpoints_security_group],
         )
+        # Same rationale as SecretsManagerEndpoint: lets VPC-placed Lambdas call sqs:SendMessage
+        # (order-status-change notifications, see NotificationsStack) without a NAT gateway. The
+        # Lambda that actually sends the email stays outside the VPC entirely and doesn't need
+        # this — only the DB-touching producers (storefront/admin_api's `orders` functions) do.
+        self.sqs_endpoint = self.vpc.add_interface_endpoint(
+            "SqsEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.SQS,
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
+            security_groups=[self.vpc_endpoints_security_group],
+        )
 
         self.db_security_group = ec2.SecurityGroup(
             self, "RdsSecurityGroup", vpc=self.vpc,

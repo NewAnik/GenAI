@@ -95,3 +95,13 @@ functions:
       - method: POST
         path: /catalog/gift-boxes
         auth: none
+
+  addresses:
+    handler: storefront/handlers/addresses_handler.lambda_handler
+    routes:
+      - method: POST
+        path: /addresses
+        auth: cognito
+      - method: POST
+        path: /addresses/create
+        auth: cognito

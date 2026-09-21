@@ -8,6 +8,7 @@ import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import aws_sqs as sqs
 from aws_cdk.assertions import Match, Template
 
 from functions_config import FunctionConfig, RouteConfig
@@ -28,6 +29,7 @@ def _build(fn_config: FunctionConfig) -> Template:
     layer = _lambda.LayerVersion.from_layer_version_arn(
         stack, "Layer", "arn:aws:lambda:ap-south-1:123456789012:layer:fake:1",
     )
+    notifications_queue = sqs.Queue(stack, "Queue")
 
     # `_build_function` only uses `self` as the construct scope, so calling it unbound with
     # `stack` in that slot avoids constructing a full StorefrontStack (which needs Docker to
@@ -35,6 +37,7 @@ def _build(fn_config: FunctionConfig) -> Template:
     StorefrontStack._build_function(
         stack, fn_config, code=_INLINE_CODE, layer=layer, vpc=vpc,
         security_group=security_group, db_secret=db_secret,
+        db_host="db-host", db_name="db-name", notifications_queue=notifications_queue,
     )
     return Template.from_stack(stack)
 

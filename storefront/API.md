@@ -120,6 +120,25 @@ All four cart-mutation endpoints return the same shape as `/cart` (`200`, or `20
                  quantity: number | null, unit_price: string | null, line_total: string | null }> }
 ```
 
+### Addresses
+
+**`POST /addresses`** — list the caller's own saved addresses, newest first. No body.
+
+Response `200`: `Array<AddressResponse>` where
+```ts
+type AddressResponse = { id: number, address_type: string | null, recipient_name: string | null,
+  phone: string | null, line1: string | null, line2: string | null, city: string | null,
+  state: string | null, pincode: string | null }
+```
+
+**`POST /addresses/create`** — create one. Body:
+```ts
+{ address_type?: string,  // default "shipping"
+  recipient_name: string, phone: string, line1: string, line2?: string,
+  city: string, state: string, pincode: string }
+```
+Response `201`: `AddressResponse`.
+
 ### Orders
 
 **`POST /checkout`** — atomically create an order from the active cart. Cart items are gift
@@ -153,8 +172,12 @@ type OrderDetail = OrderSummary & {
   shipments: Array<{ id: number, courier_name: string | null, tracking_number: string | null,
                       shipment_status: string | null, shipped_at: string | null,
                       delivered_at: string | null }>,
+  status_history: Array<{ id: number, status: string | null, note: string | null,
+                           created_at: string | null }>,
 }
 ```
+`status_history` is the full timeline, oldest first — every row `checkout()` or `admin_api`'s
+`POST /orders/{order_id}/status` has ever written for this order, not just the current snapshot.
 
 **`POST /orders/{order_id}/cancel`** — cancel (idempotent — cancelling twice is a no-op `200`,
 not an error). No body. Response `200`: `OrderSummary`. Error: `not_cancellable` (409).

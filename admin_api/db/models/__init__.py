@@ -1,7 +1,7 @@
 from db.models.audit import AuditLog
 from db.models.campaigns import Campaign, CampaignRecipient
 from db.models.catalog import Category, Product, ProductVariant
-from db.models.commerce import Order, OrderItem, Org, Quote, QuoteItem
+from db.models.commerce import Order, OrderItem, OrderStatusHistory, Org, Quote, QuoteItem
 from db.models.inventory import Inventory, Warehouse
 from db.models.offers import Offer, OfferCategory, OfferProduct
 from db.models.users import User
@@ -18,6 +18,7 @@ ALL_MODELS = [
     QuoteItem,
     Order,
     OrderItem,
+    OrderStatusHistory,
     Offer,
     OfferProduct,
     OfferCategory,
@@ -39,6 +40,7 @@ __all__ = [
     "QuoteItem",
     "Order",
     "OrderItem",
+    "OrderStatusHistory",
     "Offer",
     "OfferProduct",
     "OfferCategory",

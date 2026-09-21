@@ -8,9 +8,11 @@ from storefront_stack.storefront_stack import CONFIG_PATH
 
 def test_loads_every_function_and_route():
     functions = load_functions(CONFIG_PATH)
-    assert {fn.name for fn in functions} == {"auth", "cart", "orders", "payments"}
+    assert {fn.name for fn in functions} == {
+        "auth", "cart", "orders", "payments", "catalog", "addresses",
+    }
     total_routes = sum(len(fn.routes) for fn in functions)
-    assert total_routes == 16
+    assert total_routes == 19
 
 
 def test_defaults_apply_when_not_set_in_yaml():

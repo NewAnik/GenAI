@@ -22,6 +22,10 @@ Expects the same CDK context values as StorefrontStack (`dbSecretArn`, `dbHost`,
 required; `apiDomainName`/`apiCertificateArn` — optional custom domain), plus:
   adminApiCorsOrigins - comma-separated allowed origins for the admin app (defaults to
                         http://localhost:5173 when unset).
+
+Also takes `notifications_queue` (NotificationsStack's SQS queue), same reasoning as
+StorefrontStack: the `orders` function (its bespoke status-change endpoint) enqueues a
+notification rather than emailing directly, since this stack's Lambdas have no internet egress.
 """
 from __future__ import annotations
 
@@ -38,6 +42,7 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import aws_sqs as sqs
 from constructs import Construct
 from lambda_assets import (
     LAMBDA_RUNTIME,
@@ -53,7 +58,7 @@ CONFIG_PATH = _INFRA_ROOT / "config" / "admin_functions.yml"
 class AdminApiStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, *, vpc: ec2.IVpc,
                  db_security_group: ec2.ISecurityGroup, user_pool: cognito.IUserPool,
-                 **kwargs) -> None:
+                 notifications_queue: sqs.IQueue, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         functions = load_admin_functions(CONFIG_PATH)
@@ -117,7 +122,7 @@ class AdminApiStack(Stack):
             fn = self._build_function(
                 fn_config, code=admin_code, layer=dependencies_layer, vpc=vpc,
                 security_group=lambda_security_group, db_secret=db_secret,
-                db_host=db_host, db_name=db_name,
+                db_host=db_host, db_name=db_name, notifications_queue=notifications_queue,
             )
             integration = apigateway.LambdaIntegration(fn)
             for route in fn_config.routes:
@@ -158,12 +163,15 @@ class AdminApiStack(Stack):
                          layer: _lambda.ILayerVersion, vpc: ec2.IVpc,
                          security_group: ec2.ISecurityGroup,
                          db_secret: secretsmanager.ISecret,
-                         db_host: str, db_name: str) -> _lambda.Function:
+                         db_host: str, db_name: str,
+                         notifications_queue: sqs.IQueue) -> _lambda.Function:
         environment = {
             "DB_SECRET_ARN": db_secret.secret_arn,
             "DB_HOST": db_host,
             "DB_NAME": db_name,
         }
+        if fn_config.name == "orders":
+            environment["ORDER_NOTIFICATIONS_QUEUE_URL"] = notifications_queue.queue_url
         network_kwargs = (
             {"vpc": vpc, "security_groups": [security_group]} if fn_config.vpc else {}
         )
@@ -183,6 +191,8 @@ class AdminApiStack(Stack):
         db_secret.grant_read(fn)
         if fn_config.name == "images":
             self._grant_image_bucket_access(fn)
+        if fn_config.name == "orders":
+            notifications_queue.grant_send_messages(fn)
         return fn
 
     def _build_image_bucket(self) -> s3.Bucket:

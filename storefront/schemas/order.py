@@ -18,6 +18,13 @@ class OrderItemResponse(msgspec.Struct, kw_only=True):
     unit_price: Decimal | None = None
 
 
+class OrderStatusHistoryResponse(msgspec.Struct, kw_only=True):
+    id: int
+    status: str | None = None
+    note: str | None = None
+    created_at: datetime | None = None
+
+
 class InvoiceResponse(msgspec.Struct, kw_only=True):
     id: int
     invoice_number: str | None = None
@@ -49,6 +56,7 @@ class OrderDetail(OrderSummary, kw_only=True):
     items: list[OrderItemResponse] = msgspec.field(default_factory=list)
     invoice: InvoiceResponse | None = None
     shipments: list[ShipmentResponse] = msgspec.field(default_factory=list)
+    status_history: list[OrderStatusHistoryResponse] = msgspec.field(default_factory=list)
 
 
 class CheckoutResponse(msgspec.Struct, kw_only=True):

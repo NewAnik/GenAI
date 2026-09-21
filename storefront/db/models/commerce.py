@@ -73,3 +73,20 @@ class Shipment(BaseModel):
     shipment_status = CharField(null=True)
     shipped_at = DateTimeField(null=True)
     delivered_at = DateTimeField(null=True)
+
+
+class OrderStatusHistory(BaseModel):
+    """One row per order-status transition — written by checkout() (the initial "pending" row)
+    and, on the admin_api side, its own status-change handler. Not audit_logs: this is a
+    dedicated, status-specific timeline meant to be read back by both the admin UI and the
+    customer's own order detail."""
+
+    class Meta:
+        table_name = "order_status_history"
+
+    order = ForeignKeyField(Order, backref="status_history", column_name="order_id", null=True)
+    status = CharField(null=True)
+    changed_by_user_id = IntegerField(null=True)
+    changed_by_role = CharField(null=True)
+    note = TextField(null=True)
+    created_at = DateTimeField(null=True)

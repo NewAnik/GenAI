@@ -19,13 +19,13 @@ from decimal import Decimal
 
 from config import Settings
 from db.database import database
-from db.models import AuditLog, Invoice, Order, OrderItem, Payment, Shipment
+from db.models import AuditLog, Invoice, Order, OrderItem, OrderStatusHistory, Payment, Shipment
 from db.repositories.cart_repo import CartRepository
 from db.repositories.inventory_repo import InventoryRepository
 from db.repositories.order_repo import OrderRepository
 from db.repositories.payment_repo import PaymentRepository
 from db.repositories.user_repo import UserRepository
-from services import inventory_service
+from services import inventory_service, notifications_service
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,6 @@ def checkout(settings: Settings, *, user_id: int, org_id: int | None,
     no partial order.
     """
     cart_repo = CartRepository()
-    order_repo = OrderRepository()
     user_repo = UserRepository()
 
     with database.atomic():
@@ -83,6 +82,8 @@ def checkout(settings: Settings, *, user_id: int, org_id: int | None,
         address = user_repo.get_address(shipping_address_id, user_id=user_id)
         if address is None:
             raise InvalidAddressError("shipping address not found for this user")
+
+        user = user_repo.get_by_id(user_id)
 
         gst_rate = Decimal(str(settings.gst_rate))
         subtotal = Decimal("0")
@@ -119,11 +120,28 @@ def checkout(settings: Settings, *, user_id: int, org_id: int | None,
             "order_number": order.order_number, "total_amount": str(total_amount), "user_id": user_id,
         }, performed_by=user_id)
 
+        OrderStatusHistory.create(
+            order_id=order.id, status="pending", changed_by_user_id=user_id,
+            changed_by_role="customer", note="Order placed",
+        )
+
         cart_repo.mark_checked_out(cart)
 
         logger.info("order_created order_id=%s order_number=%s total_amount=%s item_count=%d",
                     order.id, order.order_number, total_amount, len(planned_items))
-        return CheckoutResult(order_id=order.id, order_number=order.order_number, total_amount=total_amount)
+
+    # Outside the transaction: an SQS hiccup must never roll back a real order.
+    try:
+        notifications_service.notify_order_status(
+            order_id=order.id, order_number=order.order_number, new_status="pending", old_status=None,
+            customer_email=user.email if user else None,
+            customer_name=f"{user.first_name or ''} {user.last_name or ''}".strip() if user else None,
+            total_amount=str(total_amount), changed_by_role="customer",
+        )
+    except Exception:
+        logger.exception("order_notification_enqueue_failed order_id=%s", order.id)
+
+    return CheckoutResult(order_id=order.id, order_number=order.order_number, total_amount=total_amount)
 
 
 def cancel_order(*, order_id: int, user_id: int) -> None:

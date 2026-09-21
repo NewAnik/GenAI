@@ -38,6 +38,10 @@ domain name — a plain context value rather than a CDK cross-stack reference, s
 `dbHost`/`dbName` already accept, and it avoids adding a first-ever dependency edge between this
 stack and AdminApiStack.
 
+Takes `notifications_queue` (NotificationsStack's SQS queue) so the `orders` function can enqueue
+a status-change notification for the separate, non-VPC email Lambda to send — see
+notifications_stack.py's docstring for why that Lambda can't live here and call Resend directly.
+
 Optionally, `apiDomainName` + `apiCertificateArn` context values attach a custom domain to the
 REST API with `SecurityPolicy: TLS_1_2` (the AWS-recommended minimum — the default
 `*.execute-api.<region>.amazonaws.com` endpoint already enforces TLS 1.2 on AWS's side with no
@@ -68,6 +72,7 @@ from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import aws_sqs as sqs
 from constructs import Construct
 from functions_config import FunctionConfig, load_functions
 from lambda_assets import (
@@ -84,7 +89,7 @@ CONFIG_PATH = _INFRA_ROOT / "config" / "functions.yml"
 class StorefrontStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, *, vpc: ec2.IVpc,
                  db_security_group: ec2.ISecurityGroup, user_pool: cognito.IUserPool,
-                 **kwargs) -> None:
+                 notifications_queue: sqs.IQueue, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         functions = load_functions(CONFIG_PATH)
@@ -140,7 +145,7 @@ class StorefrontStack(Stack):
             fn = self._build_function(
                 fn_config, code=storefront_code, layer=dependencies_layer, vpc=vpc,
                 security_group=lambda_security_group, db_secret=db_secret,
-                db_host=db_host, db_name=db_name,
+                db_host=db_host, db_name=db_name, notifications_queue=notifications_queue,
             )
             integration = apigateway.LambdaIntegration(fn)
             for route in fn_config.routes:
@@ -182,7 +187,8 @@ class StorefrontStack(Stack):
                          layer: _lambda.ILayerVersion, vpc: ec2.IVpc,
                          security_group: ec2.ISecurityGroup,
                          db_secret: secretsmanager.ISecret,
-                         db_host: str, db_name: str) -> _lambda.Function:
+                         db_host: str, db_name: str,
+                         notifications_queue: sqs.IQueue) -> _lambda.Function:
         environment = {
             "DB_SECRET_ARN": db_secret.secret_arn,
             # Not part of db_secret: that's RDS's own master-user secret (username/password
@@ -200,6 +206,8 @@ class StorefrontStack(Stack):
             cdn_domain = self.node.try_get_context("catalogImagesCdnDomain")
             if cdn_domain:
                 environment["CATALOG_IMAGES_CDN_DOMAIN"] = cdn_domain
+        if fn_config.name == "orders":
+            environment["ORDER_NOTIFICATIONS_QUEUE_URL"] = notifications_queue.queue_url
 
         # `vpc: false` in functions.yml opts a function out of the VPC entirely. Only safe for
         # functions that don't need DB_SECRET_ARN's Postgres access — there's no NAT gateway on
@@ -227,4 +235,6 @@ class StorefrontStack(Stack):
             **network_kwargs,
         )
         db_secret.grant_read(fn)
+        if fn_config.name == "orders":
+            notifications_queue.grant_send_messages(fn)
         return fn

@@ -486,6 +486,30 @@ resources:
     delete_groups: *staff
     audited: true
 
+  order_status_history:
+    table: order_status_history
+    columns:
+      - {name: id, type: integer}
+      - {name: order_id, type: integer}
+      - {name: status, type: text}
+      - {name: changed_by_user_id, type: integer}
+      - {name: changed_by_role, type: text}
+      - {name: note, type: text}
+      - {name: created_at, type: timestamp}
+    relations:
+      - {name: changed_by, table: users, local_key: changed_by_user_id, columns: [id, first_name, last_name, email]}
+    searchable: []
+    filterable: [order_id, status]
+    sortable: [created_at]
+    default_sort: {column: created_at, ascending: true}
+    read_groups: *staff
+    # Only GenAI/admin_api/handlers/orders_handler.py's bespoke status-change endpoint (and
+    # GenAI/storefront's checkout()) write here — never through this generic path.
+    create_groups: *none
+    update_groups: *none
+    delete_groups: *none
+    audited: false
+
   payments:
     table: payments
     columns:

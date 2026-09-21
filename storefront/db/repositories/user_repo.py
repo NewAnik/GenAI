@@ -28,3 +28,13 @@ class UserRepository:
         """Fetch an address only if it belongs to the given user (prevents using another
         user's address id at checkout)."""
         return Address.get_or_none(Address.id == address_id, Address.user_id == user_id)
+
+    def list_addresses(self, user_id: int) -> list[Address]:
+        return list(Address.select().where(Address.user_id == user_id).order_by(Address.id.desc()))
+
+    def create_address(self, user_id: int, *, address_type: str, recipient_name: str, phone: str,
+                        line1: str, line2: str | None, city: str, state: str, pincode: str) -> Address:
+        return Address.create(
+            user_id=user_id, address_type=address_type, recipient_name=recipient_name, phone=phone,
+            line1=line1, line2=line2, city=city, state=state, pincode=pincode,
+        )

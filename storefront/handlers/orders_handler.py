@@ -16,6 +16,7 @@ from schemas.order import (
     InvoiceResponse,
     OrderDetail,
     OrderItemResponse,
+    OrderStatusHistoryResponse,
     OrderSummary,
     ShipmentResponse,
 )
@@ -72,6 +73,7 @@ def _get_order(event: dict) -> dict:
     invoice = _repo.get_invoice(order_id)
     shipments = _repo.get_shipments(order_id)
     items = _repo.get_items(order_id)
+    history = _repo.get_status_history(order_id)
 
     detail = OrderDetail(
         id=order.id, order_number=order.order_number, status=order.status,
@@ -94,6 +96,10 @@ def _get_order(event: dict) -> dict:
                               shipment_status=s.shipment_status, shipped_at=s.shipped_at,
                               delivered_at=s.delivered_at)
             for s in shipments
+        ],
+        status_history=[
+            OrderStatusHistoryResponse(id=h.id, status=h.status, note=h.note, created_at=h.created_at)
+            for h in history
         ],
     )
     return json_response(200, detail)

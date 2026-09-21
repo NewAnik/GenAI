@@ -5,7 +5,7 @@ only the models it directly depends on, so listing them here in dependency order
 registry), since none of the in-scope models are mutually/self-referential."""
 from db.models.audit import AuditLog
 from db.models.catalog import GiftBox, GiftBoxImage, GiftBoxItem, Product, ProductVariant
-from db.models.commerce import Invoice, Order, OrderItem, Payment, Shipment
+from db.models.commerce import Invoice, Order, OrderItem, OrderStatusHistory, Payment, Shipment
 from db.models.inventory import Inventory
 from db.models.storefront import Address, Cart, CartItem
 from db.models.users import User
@@ -23,6 +23,7 @@ ALL_MODELS = [
     Inventory,
     Order,
     OrderItem,
+    OrderStatusHistory,
     Payment,
     Invoice,
     Shipment,
@@ -43,6 +44,7 @@ __all__ = [
     "Inventory",
     "Order",
     "OrderItem",
+    "OrderStatusHistory",
     "Payment",
     "Invoice",
     "Shipment",

@@ -26,6 +26,7 @@ _CDK_ROOT = Path(__file__).resolve().parent
 _REPO_ROOT = _CDK_ROOT.parent.parent
 STOREFRONT_ENTRY = _REPO_ROOT / "storefront"
 ADMIN_ENTRY = _REPO_ROOT / "admin_api"
+NOTIFICATIONS_ENTRY = _REPO_ROOT / "notifications"
 LAMBDA_RUNTIME = _lambda.Runtime.PYTHON_3_12
 
 
@@ -49,6 +50,13 @@ def build_admin_code() -> _lambda.Code:
     """The admin_api/ source tree as a plain (non-bundled) Lambda code asset — same rationale as
     build_storefront_code(), for the admin API's own independent handler tree."""
     return _lambda.Code.from_asset(str(ADMIN_ENTRY))
+
+
+def build_notifications_code() -> _lambda.Code:
+    """The notifications/ source tree — no dependencies layer at all, unlike the other two:
+    this Lambda's only imports are stdlib plus boto3 (Lambda-provided), so there's nothing to
+    bundle."""
+    return _lambda.Code.from_asset(str(NOTIFICATIONS_ENTRY))
 
 
 def build_dependencies_layer(

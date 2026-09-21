@@ -1,7 +1,7 @@
 """Order / order-item / invoice / shipment access for the storefront."""
 from __future__ import annotations
 
-from db.models import Invoice, Order, OrderItem, Shipment
+from db.models import Invoice, Order, OrderItem, OrderStatusHistory, Shipment
 
 
 class OrderRepository:
@@ -27,3 +27,10 @@ class OrderRepository:
 
     def get_shipments(self, order_id: int) -> list[Shipment]:
         return list(Shipment.select().where(Shipment.order_id == order_id).order_by(Shipment.id))
+
+    def get_status_history(self, order_id: int) -> list[OrderStatusHistory]:
+        return list(
+            OrderStatusHistory.select()
+            .where(OrderStatusHistory.order_id == order_id)
+            .order_by(OrderStatusHistory.id)
+        )

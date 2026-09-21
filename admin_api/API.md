@@ -108,6 +108,14 @@ transaction (copies line items, stamps GST at 18%, marks the quote `converted`).
 Response `201`: `{ id, order_number, total_amount }`. Error: `not_convertible` (409) if the quote
 is already `converted`/`rejected`/`expired`.
 
+**`POST /orders/{order_id}/status`** — the only way `orders.status` should change (replaces a raw
+write through the generic `/resources/orders/{id}/update`). Body: `{ status: string, note?:
+string }`. Validates the transition against a fixed graph (mirrors
+`wrapped-and-more-admin/src/lib/enums.ts`'s `orderTransitions`), writes an `order_status_history`
+row, records an audit entry, and enqueues a customer-facing status-change email.
+Response `200`: `{ id, status }`. Error: `invalid_transition` (409) if `status` isn't a legal next
+step from the order's current status.
+
 **`POST /offers/{offer_id}/match-count`** — how many catalogue products/gift boxes this offer
 currently matches. Response: `{ count: number }`.
 
