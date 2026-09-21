@@ -2,6 +2,8 @@
 shipment reads, plus an admin-only shipment-create that fulfills the reservation."""
 from __future__ import annotations
 
+import logging
+
 from config import get_settings
 from db.database import connection
 from db.repositories.order_repo import OrderRepository
@@ -21,6 +23,8 @@ from schemas.order import (
     ShipmentResponse,
 )
 from services import inventory_service, order_service
+
+logger = logging.getLogger(__name__)
 
 _repo = OrderRepository()
 
@@ -43,10 +47,17 @@ def _checkout(event: dict) -> dict:
             shipping_address_id=payload.shipping_address_id,
         )
     except order_service.EmptyCartError:
+        logger.warning("checkout_rejected reason=empty_cart user_id=%s", user.id)
         return error_response(400, "empty_cart", "cart is empty")
     except order_service.InvalidAddressError:
+        logger.warning("checkout_rejected reason=invalid_address user_id=%s", user.id)
         return error_response(400, "invalid_address", "invalid shipping address")
     except inventory_service.InsufficientStockError as exc:
+        logger.warning(
+            "checkout_rejected reason=insufficient_stock user_id=%s variant_id=%s "
+            "requested=%s available=%s",
+            user.id, exc.variant_id, exc.requested, exc.available,
+        )
         return error_response(
             409, "insufficient_stock",
             f"insufficient stock for variant {exc.variant_id} "
@@ -113,6 +124,10 @@ def _cancel_order(event: dict) -> dict:
     except order_service.OrderNotFoundError:
         raise NotFoundError("order not found")
     except order_service.OrderNotCancellableError as exc:
+        logger.warning(
+            "cancel_rejected reason=not_cancellable user_id=%s order_id=%s",
+            user.id, order_id,
+        )
         return error_response(409, "not_cancellable", str(exc))
     order = _repo.get_for_user(order_id, user_id=user.id)
     return json_response(200, _summary(order))
@@ -180,4 +195,4 @@ ROUTES = {
 
 def lambda_handler(event: dict, context=None) -> dict:
     with connection():
-        return dispatch(event, ROUTES)
+        return dispatch(event, ROUTES, context)

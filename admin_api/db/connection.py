@@ -4,11 +4,14 @@ concurrency grows). The same Postgres database as the storefront and the WhatsAp
 module only owns the admin API's own connection object, not a separate database."""
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from typing import Iterator
 
 from config import get_settings
 from playhouse.pool import PooledPostgresqlDatabase
+
+logger = logging.getLogger(__name__)
 
 _settings = get_settings()
 
@@ -25,17 +28,27 @@ database = PooledPostgresqlDatabase(
 
 @contextmanager
 def connection() -> Iterator[None]:
-    database.connect(reuse_if_open=True)
+    try:
+        database.connect(reuse_if_open=True)
+    except Exception:
+        logger.exception("db_connect_failed")
+        raise
+    logger.debug("db_connected")
     try:
         yield
     finally:
         if not database.is_closed():
             database.close()
+            logger.debug("db_closed")
 
 
 def raw_connection():
     """The underlying psycopg2 connection peewee's PooledPostgresqlDatabase wraps — used by
     query_builder.py's parameterized SQL, which deliberately bypasses the ORM for the generic
     resource endpoints (see query_builder.py's module docstring for why)."""
-    database.connect(reuse_if_open=True)
+    try:
+        database.connect(reuse_if_open=True)
+    except Exception:
+        logger.exception("db_connect_failed")
+        raise
     return database.connection()

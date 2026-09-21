@@ -22,9 +22,8 @@ Injection discipline (read before changing this file):
 """
 from __future__ import annotations
 
-from psycopg2 import sql
-
 from db.query_types import ColumnType, array_cast_for, cast_for
+from psycopg2 import sql
 from services.resource_registry import ResourceSpec
 
 

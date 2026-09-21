@@ -138,4 +138,4 @@ ROUTES = {
 
 def lambda_handler(event: dict, context=None) -> dict:
     with connection():
-        return dispatch(event, ROUTES)
+        return dispatch(event, ROUTES, context)

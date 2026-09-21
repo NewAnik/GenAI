@@ -80,4 +80,4 @@ def lambda_handler(event: dict, context=None) -> dict:
     # require_role's staff-profile lookup needs Postgres, same as every other handler here —
     # despite this Lambda's real work (S3) not otherwise touching the database.
     with connection():
-        return dispatch(event, ROUTES)
+        return dispatch(event, ROUTES, context)

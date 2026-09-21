@@ -39,6 +39,7 @@ class Settings:
     catalog_images_cdn_domain: str | None
     app_env: str
     log_level: str
+    log_sql: bool
 
 
 def _db_login_from_secret(secret_arn: str) -> tuple[str, str]:
@@ -88,4 +89,5 @@ def get_settings() -> Settings:
         catalog_images_cdn_domain=os.environ.get("CATALOG_IMAGES_CDN_DOMAIN"),
         app_env=os.environ.get("APP_ENV", "production"),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
+        log_sql=os.environ.get("LOG_SQL", "false").lower() == "true",
     )

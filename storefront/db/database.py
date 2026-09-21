@@ -11,12 +11,14 @@ follow-up.
 """
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from typing import Iterator
 
+from config import get_settings
 from playhouse.pool import PooledPostgresqlDatabase
 
-from config import get_settings
+logger = logging.getLogger(__name__)
 
 _settings = get_settings()
 
@@ -37,9 +39,15 @@ def connection() -> Iterator[None]:
     `database.atomic()`; this context manager's `finally` is a safety net that only matters
     if an exception left a transaction open — `reuse_if_open=True` makes reconnecting on the
     next warm invocation cheap either way."""
-    database.connect(reuse_if_open=True)
+    try:
+        database.connect(reuse_if_open=True)
+    except Exception:
+        logger.exception("db_connect_failed")
+        raise
+    logger.debug("db_connected")
     try:
         yield
     finally:
         if not database.is_closed():
             database.close()
+            logger.debug("db_closed")
